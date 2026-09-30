@@ -2,54 +2,50 @@
     <div id="langr-reading" ref="reading" style="height: 100%">
         <NConfigProvider :theme="theme" :theme-overrides="themeConfig"
             style="height: 100%; display: flex; flex-direction: column">
-            <!-- 功能区 -->
-            <div class="function-area">
+            <!-- 顶部阅读工具栏：笔记 / 本页词汇进度 / 完成阅读 -->
+            <header class="reading-topbar">
+                <button class="notes-toggle" @click="activeNotes = true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    {{ t("Jot down Notes") }}
+                </button>
+
+                <div v-if="plugin.settings.word_count" class="topbar-count">
+                    <CountBar :unknown="unknown" :learn="learn" :ignore="ignore" />
+                </div>
+
+                <NButton v-if="page * pageSize < totalLines" class="finish-reading" type="primary" secondary size="small" @click="addIgnores">
+                    {{ t("Complete reading and proceed to the next page") }}
+                </NButton>
+                <NButton v-else class="finish-reading" type="primary" secondary size="small" @click="addIgnores">
+                    {{ t("Complete reading") }}
+                </NButton>
+            </header>
+
+            <!-- 音频媒体条（存在音频时） -->
+            <div v-if="audioSource" class="audio-strip">
                 <AudioPlayer
-                    v-if="audioSource"
                     :audio-source="audioSource"
                     @loaded="onAudioLoaded"
                     @error="onAudioError"
                 />
-                <div style="display: flex">
-                    <button @click="activeNotes = true">{{t("Jot down Notes")}}</button>
-                    <div style="
-                            flex: 1;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                        ">
-                        <CountBar v-if="plugin.settings.word_count" :unknown="unknown" :learn="learn"
-                            :ignore="ignore" />
-                    </div>
-                    <NButton v-if="page * pageSize < totalLines" class="finish-reading" @click="addIgnores" >
-                        {{ t("Complete reading and proceed to the next page") }}
-                    </NButton>
-                    <NButton v-else class="finish-reading" @click="addIgnores" >
-                        {{ t("Complete reading") }}
-                    </NButton>
-                </div>
             </div>
-            <!-- 阅读区 -->
-            <div class="text-area" style="
-                    flex: 1;
-                    overflow: auto;
-                    padding-left: 5%;
-                    padding-right: 5%;
-                " :style="{
+
+            <!-- 阅读正文：限宽居中栏 -->
+            <div class="text-area" :style="{
                     fontSize: store.fontSize,
                     fontFamily: store.fontFamily,
                     lineHeight: store.lineHeight,
                 }" v-html="renderedText" />
-            <!-- 底栏 -->
-            <div class="pagination" style="
-                    padding: 10px 0;
-                    border-top: 2px solid gray;
-                    display: flex;
-                    flex-direction: column;
-                ">
-                <NPagination style="justify-content: center" v-model:page="page" v-model:page-size="pageSize"
+
+            <!-- 底部分页栏 -->
+            <footer class="reading-statusbar">
+                <NPagination class="status-pagination" v-model:page="page" v-model:page-size="pageSize"
                     :item-count="totalLines" show-size-picker :page-sizes="pageSizes" :page-slot="pageSlot" />
-            </div>
+            </footer>
+
             <NDrawer v-model:show="activeNotes" :placement="'bottom'" :close-on-esc="true" :auto-focus="true"
                 :on-after-enter="afterNoteEnter" :on-after-leave="afterNoteLeave" to="#langr-reading"
                 :default-height="250" resizable>
@@ -90,6 +86,7 @@ import PluginType from "@/plugin";
 import { t } from "@/lang/helper";
 import { useEvent } from "@/utils/use";
 import store from "@/store";
+import { getThemeOverrides } from "@/styles/theme";
 import { ReadingView } from "./ReadingView";
 import CountBar from "./CountBar.vue";
 import AudioPlayer from "@/component/AudioPlayer.vue";
@@ -106,6 +103,7 @@ const theme = computed(() => {
 });
 
 const themeConfig: GlobalThemeOverrides = {
+    ...getThemeOverrides(store.dark),
     Drawer: {
         bodyPadding: "8px 12px",
         headerPadding: "4px 6px",
@@ -357,26 +355,95 @@ if (plugin.constants.platform === "mobile") {
 #langr-reading {
     user-select: none;
 
-    .function-area {
-        padding-bottom: 10px;
-        border-bottom: 2px solid gray;
+    // ── 顶部工具栏：笔记 / 进度 / 完成阅读 ───────────────────
+    .reading-topbar {
+        display: flex;
+        align-items: center;
+        gap: var(--ll-space-3);
+        flex-wrap: wrap;
+        padding: var(--ll-space-2) var(--ll-space-4);
+        border-bottom: 1px solid var(--ll-border);
+        flex-shrink: 0;
+
+        .notes-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--ll-border);
+            border-radius: var(--ll-radius-sm);
+            color: var(--ll-text-2);
+            cursor: pointer;
+            padding: 4px 12px;
+            font-size: 13px;
+            transition: color var(--ll-speed) var(--ll-ease),
+                border-color var(--ll-speed) var(--ll-ease),
+                background-color var(--ll-speed) var(--ll-ease);
+
+            svg {
+                width: 14px;
+                height: 14px;
+                display: block;
+            }
+
+            &:hover {
+                color: var(--ll-primary);
+                border-color: var(--ll-primary);
+                background: var(--ll-primary-soft);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--ll-primary);
+                outline-offset: 1px;
+            }
+        }
+
+        // 本页词汇掌握进度：阅读中持续可见
+        .topbar-count {
+            flex: 1 1 220px;
+            min-width: 180px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .finish-reading {
+            flex-shrink: 0;
+            margin-left: auto;
+        }
 
         button {
             width: auto;
         }
     }
 
+    // ── 音频媒体条 ──────────────────────────────────────────
+    .audio-strip {
+        flex-shrink: 0;
+        padding: var(--ll-space-2) var(--ll-space-4);
+        background: var(--ll-surface-2);
+        border-bottom: 1px solid var(--ll-border);
+    }
+
+    // ── 阅读正文：限宽居中栏 ─────────────────────────────────
     .text-area {
+        flex: 1;
+        overflow: auto;
+        width: 100%;
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: var(--ll-space-5) var(--ll-space-4) var(--ll-space-6);
+        box-sizing: border-box;
         touch-action: none;
 
         span.word {
             user-select: contain;
             border: 1px solid transparent;
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: var(--ll-radius-xs);
+            transition: border-color var(--ll-speed) var(--ll-ease);
 
             &:hover {
-                border-color: deepskyblue;
+                border-color: var(--ll-primary);
             }
         }
 
@@ -386,10 +453,11 @@ if (plugin.constants.platform === "mobile") {
             padding-bottom: 3px;
             cursor: pointer;
             border: 1px solid transparent;
-            border-radius: 4px;
+            border-radius: var(--ll-radius-xs);
+            transition: border-color var(--ll-speed) var(--ll-ease);
 
             &:hover {
-                border-color: deepskyblue;
+                border-color: var(--ll-primary);
             }
         }
 
@@ -424,16 +492,30 @@ if (plugin.constants.platform === "mobile") {
         }
 
         .select {
-            background-color: #90ee9060;
+            background-color: var(--ll-primary-soft);
             padding-top: 3px;
             padding-bottom: 3px;
             cursor: pointer;
             border: 1px solid transparent;
-            border-radius: 4px;
+            border-radius: var(--ll-radius-xs);
 
             &:hover {
-                border: 1px solid green;
+                border-color: var(--ll-primary);
             }
+        }
+    }
+
+    // ── 底部分页栏：居中紧凑 ────────────────────────────────
+    .reading-statusbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--ll-space-2) var(--ll-space-4);
+        border-top: 1px solid var(--ll-border);
+        flex-shrink: 0;
+
+        .status-pagination {
+            justify-content: center;
         }
     }
 
@@ -441,24 +523,33 @@ if (plugin.constants.platform === "mobile") {
         display: flex;
         height: 100%;
         width: 100%;
+        gap: var(--ll-space-2);
 
         .note-input {
             flex: 1;
         }
 
         .note-rendered {
-            border: 1px solid gray;
-            border-radius: 3px;
+            border: 1px solid var(--ll-border);
+            border-radius: var(--ll-radius-sm);
             flex: 1;
-            padding: 5px;
-            margin-left: 2px;
+            padding: var(--ll-space-2);
             overflow: auto;
+            user-select: text;
         }
     }
 }
 
 .is-mobile #langr-reading {
-    .pagination {
+    .reading-topbar {
+        // 窄屏：进度条独占一行
+        .topbar-count {
+            flex-basis: 100%;
+            order: 3;
+        }
+    }
+
+    .reading-statusbar {
         padding-bottom: 48px;
     }
 }

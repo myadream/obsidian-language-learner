@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { normalizePath } from "./obsidian-stub";
 
@@ -10,9 +11,35 @@ import { normalizePath } from "./obsidian-stub";
 export class MemVaultAdapter {
     files = new Map<string, string | Uint8Array>();
     dirs = new Set<string>();
+    private realBaseDir: string | null = null;
 
     constructor() {
         this.dirs.add("");
+    }
+
+    /**
+     * 桌面端 DataAdapter 的方法，真实文件系统路径。
+     * tedb 驱动经 Node fs 直接读写，测试时分配一个独立临时目录。
+     */
+    getBasePath(): string {
+        if (this.realBaseDir === null) {
+            this.realBaseDir = fs.mkdtempSync(
+                path.join(os.tmpdir(), "oll-mem-adapter-")
+            ).replace(/\\/g, "/");
+        }
+        return this.realBaseDir;
+    }
+
+    /** 删除 getBasePath 分配的临时目录（幂等） */
+    dispose(): void {
+        if (this.realBaseDir !== null) {
+            try {
+                fs.rmSync(this.realBaseDir, { recursive: true, force: true });
+            } catch {
+                // Windows 上偶发句柄未释放，交给 OS 临时目录清理
+            }
+            this.realBaseDir = null;
+        }
     }
 
     /** 把真实的 sql-wasm.wasm 预置到 Obsidian 插件目录路径下 */

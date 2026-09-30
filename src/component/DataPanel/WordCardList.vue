@@ -1,87 +1,94 @@
 <template>
-    <div class="word-card-list">
-        <!-- 使用 CSS Grid 实现响应式布局 -->
-        <TransitionGroup name="list" tag="div" class="card-grid">
+    <div class="word-ledger">
+        <!-- 列头（宽屏） -->
+        <div class="ledger-head" aria-hidden="true">
+            <span class="col-word">{{ t("Word") }}</span>
+            <span class="col-status">{{ t("Status") }}</span>
+            <span class="col-date">{{ t("Added Date") }}</span>
+            <span class="col-records">{{ t("Notes") }}</span>
+            <span class="col-actions"></span>
+        </div>
+
+        <!-- 数据行 -->
+        <TransitionGroup name="rows" tag="div" class="ledger-body">
             <div
                 v-for="item in data"
                 :key="item.expr"
-                class="word-card"
-                @click="handleCardClick(item)"
+                class="ledger-row"
+                role="button"
+                tabindex="0"
+                @click="handleRowClick(item)"
+                @keydown.enter.prevent="handleRowClick(item)"
             >
-                <!-- 单词和状态 -->
-                <div class="card-header">
-                    <div class="word-info">
-                        <span class="word-text" :title="item.expr">{{ item.expr }}</span>
-                        <NTag
-                            size="small"
-                            :style="getStatusStyle(item.statusIndex)"
-                        >
-                            {{ item.status }}
-                        </NTag>
-                    </div>
-                    <div class="action-buttons">
-                        <NButton
-                            size="tiny"
-                            type="info"
-                            secondary
-                            @click.stop="handleEdit(item)"
-                        >
-                            {{ t("Edit") }}
-                        </NButton>
-                        <NButton
-                            v-if="item.noteNum + item.senNum > 0"
-                            size="tiny"
-                            type="default"
-                            @click.stop="handleViewDetails(item)"
-                        >
-                            {{ t("Details") }}
-                        </NButton>
-                    </div>
+                <!-- 状态色边 -->
+                <span class="row-edge" :class="`s-${statusClass(item.statusIndex)}`" aria-hidden="true"></span>
+
+                <!-- 单词 + 释义 + 标签（纵向块：释义缺省时不留空列） -->
+                <div class="row-main">
+                    <span class="row-word" :title="item.expr">{{ item.expr }}</span>
+                    <span v-if="item.meaning" class="row-meaning" :title="item.meaning">{{ item.meaning }}</span>
+                    <span v-if="item.tags && item.tags.length > 0" class="row-tags">
+                        <span v-for="(tag, i) in item.tags" :key="i" class="row-tag">#{{ tag }}</span>
+                    </span>
                 </div>
 
-                <!-- 含义 -->
-                <div v-if="item.meaning" class="card-meaning">
-                    <span class="label">{{ t("Meaning") }}:</span>
-                    <span class="content">{{ item.meaning }}</span>
+                <!-- 状态芯片 -->
+                <span class="ll-status-chip" :class="`s-${statusClass(item.statusIndex)}`">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    {{ item.status }}
+                </span>
+
+                <!-- 日期 -->
+                <span class="row-date" :title="item.date">{{ formatDate(item.date) }}</span>
+
+                <!-- 笔记/例句计数 -->
+                <div class="row-records">
+                    <span v-if="item.noteNum > 0" class="record" :title="t('Notes')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        {{ item.noteNum }}
+                    </span>
+                    <span v-if="item.senNum > 0" class="record" :title="t('Sentences')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        {{ item.senNum }}
+                    </span>
                 </div>
 
-                <!-- 标签 -->
-                <div v-if="item.tags && item.tags.length > 0" class="card-tags">
-                    <NSpace :size="6" :wrap="true">
-                        <NTag
-                            v-for="(tag, i) in item.tags.slice(0, 4)"
-                            :key="i"
-                            size="small"
-                            type="info"
-                            :bordered="false"
-                        >
-                            #{{ tag }}
-                        </NTag>
-                        <NTag
-                            v-if="item.tags.length > 4"
-                            size="small"
-                            type="default"
-                            :bordered="false"
-                        >
-                            +{{ item.tags.length - 4 }}
-                        </NTag>
-                    </NSpace>
-                </div>
-
-                <!-- 统计信息 -->
-                <div class="card-stats">
-                    <div v-if="item.noteNum > 0" class="stat-item" :title="t('Notes')">
-                        <span class="stat-icon">📝</span>
-                        <span class="stat-value">{{ item.noteNum }}</span>
-                    </div>
-                    <div v-if="item.senNum > 0" class="stat-item" :title="t('Sentences')">
-                        <span class="stat-icon">💬</span>
-                        <span class="stat-value">{{ item.senNum }}</span>
-                    </div>
-                    <div class="stat-item" :title="t('Added Date')">
-                        <span class="stat-icon">📅</span>
-                        <span class="stat-value">{{ formatDate(item.date) }}</span>
-                    </div>
+                <!-- 行内操作：图标按钮，悬停显现（窄屏/触屏常显） -->
+                <div class="row-actions">
+                    <NButton
+                        size="tiny"
+                        quaternary
+                        :title="t('Edit')"
+                        :aria-label="t('Edit')"
+                        @click.stop="handleEdit(item)"
+                    >
+                        <template #icon>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                            </svg>
+                        </template>
+                    </NButton>
+                    <NButton
+                        v-if="item.noteNum + item.senNum > 0"
+                        size="tiny"
+                        quaternary
+                        type="info"
+                        :title="t('Details')"
+                        :aria-label="t('Details')"
+                        @click.stop="handleViewDetails(item)"
+                    >
+                        <template #icon>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </template>
+                    </NButton>
                 </div>
             </div>
         </TransitionGroup>
@@ -97,9 +104,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { NTag, NButton, NSpace } from 'naive-ui';
+import { NButton } from 'naive-ui';
 import { t } from '@/lang/helper';
-import { StatusColorMap } from '@/statusColors';
+import { StatusClassMap } from '@/statusColors';
 import WordMoreModal from '@/component/WordMoreModal.vue';
 import { moment } from 'obsidian';
 
@@ -125,54 +132,23 @@ const emit = defineEmits<{
 const showModal = ref(false);
 const currentWord = ref<Row | null>(null);
 
-// 缓存状态颜色映射，避免重复计算
-const statusStyleCache = new Map<number, ReturnType<typeof getStatusStyle>>();
-
 const handleEdit = (item: Row) => {
     emit('edit', item);
 };
 
 const handleViewDetails = (item: Row) => {
-    console.log("========== [WordCardList] handleViewDetails called ==========");
-    console.log("item:", JSON.stringify(item, null, 2));
-    console.log("item.expr:", item.expr);
-    console.log("item.noteNum:", item.noteNum, "item.senNum:", item.senNum);
-
     currentWord.value = item;
     showModal.value = true;
-
-    console.log("After setting:");
-    console.log("  - currentWord.value:", currentWord.value);
-    console.log("  - showModal.value:", showModal.value);
-    console.log("  - currentWord.value?.expr:", currentWord.value?.expr);
-    console.log("========== [WordCardList] handleViewDetails end ==========\n");
 };
 
-// 卡片点击处理：点击卡片本身也能查看详情
-const handleCardClick = (item: Row) => {
+// 行点击处理：点击行本身也能查看详情
+const handleRowClick = (item: Row) => {
     handleViewDetails(item);
 };
 
-const getStatusStyle = (statusIndex: number) => {
-    // 检查缓存
-    if (statusStyleCache.has(statusIndex)) {
-        return statusStyleCache.get(statusIndex)!;
-    }
-
-    // 计算并缓存
-    const colorConfig = StatusColorMap[statusIndex];
-    const color = colorConfig?.main || '#999';
-    const bgColor = colorConfig?.bg || `${color}20`;
-    const borderColor = colorConfig?.border || `${color}40`;
-
-    const style = {
-        backgroundColor: bgColor,
-        color: color,
-        border: `1px solid ${borderColor}`
-    };
-
-    statusStyleCache.set(statusIndex, style);
-    return style;
+// 状态 → CSS 类名（颜色由 --status-* 变量提供，自动适配明暗主题）
+const statusClass = (statusIndex: number) => {
+    return StatusClassMap[statusIndex] || 'ignore';
 };
 
 // 格式化日期显示
@@ -203,326 +179,250 @@ const formatDate = (dateStr: string) => {
 </script>
 
 <style lang="scss" scoped>
-.word-card-list {
-    padding: 10px 0;
+.word-ledger {
+    width: 100%;
 
-    .card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 16px;
-        width: 100%;
-        position: relative;
+    // ── 列头 ────────────────────────────────────────────────
+    .ledger-head {
+        display: flex;
+        align-items: center;
+        gap: var(--ll-space-3);
+        padding: var(--ll-space-2) var(--ll-space-4) var(--ll-space-2) calc(var(--ll-space-4) + 3px);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ll-text-3);
+        border-bottom: 1px solid var(--ll-border);
+
+        .col-word { flex: 1; min-width: 0; }
+        .col-status { flex: 0 0 86px; }
+        .col-date { flex: 0 0 72px; text-align: right; }
+        .col-records { flex: 0 0 64px; text-align: right; }
+        .col-actions { flex: 0 0 64px; }
     }
 
-    .word-card {
-        background: var(--n-card-color);
-        border: 1px solid var(--n-border-color);
-        border-radius: 8px;
-        padding: 16px;
+    // ── 数据行 ──────────────────────────────────────────────
+    .ledger-row {
         display: flex;
-        flex-direction: column;
-        gap: 12px;
+        align-items: center;
+        gap: var(--ll-space-3);
+        padding: var(--ll-space-2) var(--ll-space-4) var(--ll-space-2) calc(var(--ll-space-4) + 3px);
+        border-bottom: 1px solid var(--ll-border);
+        cursor: pointer;
         position: relative;
-        overflow: hidden;
-        min-height: 180px; // 固定最小高度，避免分页时抖动
-        cursor: pointer; // 添加指针光标，提示可点击
-
-        // 添加微妙的进入动画
-        animation: card-enter 0.3s ease-out;
-
-        // 增强的 hover 效果
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-        // 增强深色模式下的边框和阴影
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08),
-                    0 1px 3px rgba(0, 0, 0, 0.05);
-
-        // 使用伪元素增强边框效果（深色模式下更明显）
-        &::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 8px;
-            padding: 1px;
-            background: linear-gradient(
-                to bottom,
-                rgba(128, 128, 128, 0.1),
-                rgba(128, 128, 128, 0.05)
-            );
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
-            opacity: 0.6;
-        }
+        min-height: 44px;
+        box-sizing: border-box;
+        transition: background-color var(--ll-speed) var(--ll-ease);
 
         &:hover {
-            border-color: var(--n-primary-color);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
-                        0 2px 6px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+            background: var(--ll-surface-2);
 
-            // hover 时增强伪元素边框
-            &::before {
+            .row-word {
+                color: var(--ll-primary-strong);
+            }
+
+            .row-actions {
                 opacity: 1;
-                background: linear-gradient(
-                    to bottom,
-                    rgba(var(--n-primary-color-rgb), 0.2),
-                    rgba(var(--n-primary-color-rgb), 0.1)
-                );
-            }
-
-            .word-text {
-                color: var(--n-primary-color);
+                pointer-events: auto;
             }
         }
 
-        // 点击反馈
-        &:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        &:focus-visible {
+            outline: 2px solid var(--ll-primary);
+            outline-offset: -2px;
         }
 
-        // 深色模式下的特殊样式
-        :global(body.dark-mode) & {
-            background: linear-gradient(
-                to bottom,
-                rgba(40, 40, 40, 0.8),
-                rgba(35, 35, 35, 0.9)
-            );
-            border-color: rgba(128, 128, 128, 0.3);
-            box-shadow:
-                0 2px 8px rgba(0, 0, 0, 0.3),
-                0 1px 3px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        // 左缘状态色条：2px 方形
+        .row-edge {
+            position: absolute;
+            left: 0;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            background: var(--ll-border);
 
-            &::before {
-                opacity: 0.8;
-                background: linear-gradient(
-                    to bottom,
-                    rgba(128, 128, 128, 0.2),
-                    rgba(128, 128, 128, 0.1)
-                );
-            }
-
-            &:hover {
-                border-color: rgba(128, 128, 128, 0.5);
-                box-shadow:
-                    0 4px 12px rgba(0, 0, 0, 0.4),
-                    0 2px 6px rgba(0, 0, 0, 0.3),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-
-                &::before {
-                    background: linear-gradient(
-                        to bottom,
-                        rgba(var(--n-primary-color-rgb), 0.3),
-                        rgba(var(--n-primary-color-rgb), 0.2)
-                    );
+            @each $s in ignore learning familiar known learned {
+                &.s-#{$s} {
+                    background: var(--status-#{$s}-main);
                 }
             }
         }
 
-        .card-header {
+        // 单词 / 释义 / 标签 纵向块
+        .row-main {
+            flex: 1;
+            min-width: 0;
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 12px;
+            flex-direction: column;
+            gap: 2px;
 
-            .word-info {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                flex: 1;
-                flex-wrap: wrap;
-                min-width: 0; // 防止 flex 子元素溢出
-
-                .word-text {
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: var(--n-text-color);
-                    transition: color 0.2s;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    max-width: 100%;
-                }
-            }
-
-            .action-buttons {
-                display: flex;
-                gap: 6px;
-                flex-shrink: 0;
-                align-items: center;
-            }
-        }
-
-        .card-meaning {
-            padding: 10px 12px;
-            background: var(--n-modal-color);
-            border-radius: 6px;
-            border-left: 3px solid var(--n-primary-color);
-            transition: all 0.2s;
-            flex-shrink: 0;
-            position: relative;
-            font-size: 0.95em;
-
-            // 增强深色模式下的对比度
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-
-            &:hover {
-                background: var(--n-color-target);
-            }
-
-            .label {
+            .row-word {
+                font-size: 14px;
                 font-weight: 600;
-                margin-right: 8px;
-                color: var(--n-text-color-2);
-                font-size: 0.9em;
-                display: inline;
+                color: var(--ll-text);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                transition: color var(--ll-speed) var(--ll-ease);
             }
 
-            .content {
-                color: var(--n-text-color);
-                line-height: 1.6;
-                word-break: break-word;
-                display: inline;
+            .row-meaning {
+                font-size: 12px;
+                color: var(--ll-text-3);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
-            // 深色模式下的优化
-            :global(body.dark-mode) & {
-                background: linear-gradient(
-                    to right,
-                    rgba(60, 60, 60, 0.6),
-                    rgba(50, 50, 50, 0.4)
-                );
-                border-left-color: var(--n-primary-color);
-                box-shadow:
-                    inset 0 1px 2px rgba(0, 0, 0, 0.15),
-                    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
-
-                &:hover {
-                    background: linear-gradient(
-                        to right,
-                        rgba(70, 70, 70, 0.7),
-                        rgba(60, 60, 60, 0.5)
-                    );
-                }
-            }
-        }
-
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
-
-            .more-tags {
-                color: var(--n-text-color-3);
-                font-size: 0.9em;
-            }
-        }
-
-        .card-stats {
-            display: flex;
-            gap: 12px;
-            padding-top: 10px;
-            margin-top: auto;
-            border-top: 1px solid var(--n-divider-color);
-            flex-wrap: wrap;
-
-            // 增强分隔线的可见度
-            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
-
-            .stat-item {
+            // 标签随内容换行，全部展示
+            .row-tags {
                 display: flex;
-                align-items: center;
+                flex-wrap: wrap;
                 gap: 4px;
-                font-size: 0.85em;
-                color: var(--n-text-color-2);
-                transition: all 0.2s;
-                padding: 3px 8px;
-                border-radius: 12px;
-                background: var(--n-color-modal);
+                margin-top: 1px;
 
-                &:hover {
-                    color: var(--n-primary-color);
-                    background: var(--n-color-target);
-
-                    .stat-icon {
-                        transform: scale(1.1);
-                    }
-                }
-
-                .stat-icon {
-                    font-size: 1.15em;
-                    transition: transform 0.2s;
-                }
-
-                .stat-value {
-                    color: var(--n-text-color);
-                    font-weight: 500;
+                .row-tag {
+                    font-size: 11px;
+                    line-height: 1;
+                    padding: 2px 5px;
+                    border-radius: var(--ll-radius-xs);
+                    background: var(--ll-surface-3);
+                    color: var(--ll-text-2);
+                    white-space: nowrap;
                 }
             }
+        }
 
-            // 深色模式下的优化
-            :global(body.dark-mode) & {
-                border-top-color: rgba(128, 128, 128, 0.2);
-                box-shadow:
-                    0 1px 0 rgba(0, 0, 0, 0.1),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        .row-date {
+            flex: 0 0 72px;
+            text-align: right;
+            font-size: 12px;
+            color: var(--ll-text-3);
+            font-variant-numeric: tabular-nums;
+        }
 
-                .stat-item {
-                    background: rgba(60, 60, 60, 0.4);
+        .row-records {
+            flex: 0 0 64px;
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--ll-space-2);
 
-                    &:hover {
-                        background: rgba(80, 80, 80, 0.5);
-                    }
+            .record {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 11.5px;
+                color: var(--ll-text-3);
+                font-variant-numeric: tabular-nums;
 
-                    .stat-value {
-                        color: rgba(255, 255, 255, 0.9);
-                    }
+                svg {
+                    width: 12px;
+                    height: 12px;
+                    flex-shrink: 0;
                 }
+            }
+        }
+
+        // 行内操作：方形图标按钮，悬停显现
+        .row-actions {
+            flex: 0 0 64px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 2px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--ll-speed) var(--ll-ease);
+
+            .n-button {
+                --n-padding: 0 4px;
+            }
+
+            svg {
+                width: 14px;
+                height: 14px;
+                display: block;
+            }
+        }
+    }
+
+    // 状态芯片：方形小圆角（静态语义徽标）
+    .ll-status-chip {
+        flex: 0 0 86px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: var(--ll-radius-xs);
+        border: 1px solid transparent;
+        white-space: nowrap;
+        box-sizing: border-box;
+        justify-content: center;
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+
+        @each $s in ignore learning familiar known learned {
+            &.s-#{$s} {
+                color: var(--status-#{$s}-main);
+                background: var(--status-#{$s}-bg);
+                border-color: var(--status-#{$s}-border);
             }
         }
     }
 }
 
-// 列表过渡动画 (TransitionGroup)
-.list-enter-active,
-.list-leave-active {
-    transition: all 0.3s ease;
+// 行过渡动画（TransitionGroup）：轻微淡入，不做位移
+.rows-enter-active,
+.rows-leave-active {
+    transition: opacity 0.2s ease;
 }
 
-.list-enter-from {
+.rows-enter-from,
+.rows-leave-to {
     opacity: 0;
-    transform: translateY(30px) scale(0.95);
 }
 
-.list-leave-to {
-    opacity: 0;
-    transform: scale(0.95);
+.rows-move {
+    transition: transform 0.2s ease;
 }
 
-.list-move {
-    transition: transform 0.3s ease;
-}
+// ── 窄屏（右侧边栏停靠）：收起次要列，操作常显 ──────────────
+@media (max-width: 760px) {
+    .word-ledger {
+        .ledger-head {
+            display: none;
+        }
 
-/* 确保离开的元素脱离文档流，实现平滑的布局动画 */
-.list-leave-active {
-    position: absolute;
-    width: 100%;
-    z-index: 0;
-}
+        .ledger-row {
+            .col-date,
+            .row-date,
+            .col-records,
+            .row-records {
+                display: none;
+            }
 
-// 卡片进入动画
-@keyframes card-enter {
-    0% {
-        opacity: 0;
-        transform: translateY(20px) scale(0.95);
+            .row-actions {
+                opacity: 1;
+                pointer-events: auto;
+            }
+        }
     }
-    100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rows-enter-active,
+    .rows-leave-active,
+    .rows-move {
+        transition: none;
     }
 }
 </style>

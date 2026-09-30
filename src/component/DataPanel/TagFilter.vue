@@ -1,41 +1,37 @@
 <template>
     <div class="tag-filter" v-if="tags.length > 0">
-        <NSpace align="center" :size="10">
-            <span class="tag-label">
-                {{ t("Tags") }}:
-            </span>
+        <div class="rail-head">
+            <span class="rail-head-title">{{ t("Tags") }}</span>
+            <NSelect
+                class="mode-select"
+                :value="mode"
+                @update:value="updateMode"
+                :options="modeOptions"
+                size="tiny"
+                :consistent-menu-width="false"
+            />
+        </div>
 
-            <NSpace :size="10" align="center">
-                <!-- And/Or 模式选择 -->
-                <NSelect
-                    :value="mode"
-                    @update:value="updateMode"
-                    :options="modeOptions"
-                    size="small"
-                    style="width: 80px;"
+        <div class="tag-check-list">
+            <label
+                v-for="(tag, i) in tags"
+                :key="i"
+                class="tag-check"
+            >
+                <input
+                    type="checkbox"
+                    class="tag-checkbox"
+                    :checked="checkedTags[i]"
+                    @change="updateTag(i, ($event.target as HTMLInputElement).checked)"
                 />
-
-                <!-- 标签列表 -->
-                <NSpace :size="6" :wrap="true">
-                    <NTag
-                        v-for="(tag, i) in tags"
-                        :key="i"
-                        size="small"
-                        :checkable="true"
-                        :checked="checkedTags[i]"
-                        @update:checked="(val) => updateTag(i, val)"
-                        :type="checkedTags[i] ? 'info' : 'default'"
-                    >
-                        {{ "#" + tag }}
-                    </NTag>
-                </NSpace>
-            </NSpace>
-        </NSpace>
+                <span class="tag-name" :title="'#' + tag">#{{ tag }}</span>
+            </label>
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { NTag, NSelect, NSpace } from 'naive-ui';
+import { NSelect } from 'naive-ui';
 import { t } from '@/lang/helper';
 
 const props = defineProps<{
@@ -50,8 +46,8 @@ const emit = defineEmits<{
 }>();
 
 const modeOptions = [
-    { label: 'And', value: 'and' },
-    { label: 'Or', value: 'or' }
+    { label: t('And'), value: 'and' },
+    { label: t('Or'), value: 'or' }
 ];
 
 const updateTag = (index: number, value: boolean) => {
@@ -77,13 +73,74 @@ const updateMode = (value: 'and' | 'or') => {
 
 <style lang="scss" scoped>
 .tag-filter {
-    margin: 10px 0;
+    .rail-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--ll-space-2);
+        margin-bottom: var(--ll-space-2);
 
-    .tag-label {
-        display: inline-block;
-        font-size: 1.1em;
-        font-weight: bold;
-        white-space: nowrap;
+        .rail-head-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--ll-text-3);
+        }
+
+        .mode-select {
+            width: 72px;
+            flex-shrink: 0;
+        }
+    }
+
+    .tag-check-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .tag-check {
+        display: flex;
+        align-items: center;
+        gap: var(--ll-space-2);
+        padding: 3px var(--ll-space-1);
+        border-radius: var(--ll-radius-sm);
+        cursor: pointer;
+        transition: background-color var(--ll-speed) var(--ll-ease);
+
+        &:hover {
+            background: var(--ll-hover);
+        }
+
+        &:has(.tag-checkbox:focus-visible) {
+            outline: 2px solid var(--ll-primary);
+            outline-offset: -2px;
+        }
+
+        .tag-checkbox {
+            width: 13px;
+            height: 13px;
+            margin: 0;
+            flex-shrink: 0;
+            accent-color: var(--ll-primary);
+            cursor: pointer;
+        }
+
+        .tag-name {
+            font-size: 12.5px;
+            color: var(--ll-text-2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        &:hover .tag-name {
+            color: var(--ll-text);
+        }
     }
 }
 </style>

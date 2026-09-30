@@ -447,15 +447,13 @@ onUnmounted(() => {
 <style lang="scss">
 .audio-player-container {
     width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 8px 0;
+    padding: 0;
 
     audio {
         width: 100%;
         height: 40px;
         outline: none;
-        border-radius: 4px;
+        border-radius: var(--ll-radius-sm);
 
         &::-webkit-media-controls-panel {
             background-color: var(--background-modifier-border);
@@ -475,7 +473,7 @@ onUnmounted(() => {
     justify-content: space-between;
     padding: 8px 12px;
     margin-top: 4px;
-    border-radius: 4px;
+    border-radius: var(--ll-radius-sm);
     font-size: 0.9em;
     animation: fadeIn 0.3s ease-in;
 
@@ -514,7 +512,7 @@ onUnmounted(() => {
 
     .retry-button {
         padding: 4px 12px;
-        border-radius: 4px;
+        border-radius: var(--ll-radius-sm);
         cursor: pointer;
         background-color: var(--interactive-accent);
         color: var(--text-on-accent);

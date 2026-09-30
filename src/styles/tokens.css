@@ -1,0 +1,93 @@
+/**
+ * Language Learner 设计令牌（Design Tokens）
+ * 风格：扁平化 · 内容优先 · 融入 Obsidian 原生主题
+ * 表面/文字/边框全部映射到 Obsidian 变量，明暗主题自动适配
+ */
+
+:root {
+    /* 品牌色 —— 学习主题青绿 Teal */
+    --ll-primary: #0d9488;
+    --ll-primary-strong: #0f766e;
+    --ll-primary-suppl: #14b8a6;
+    --ll-primary-soft: rgba(13, 148, 136, 0.12);
+    /* 行动强调色 */
+    --ll-accent: #ea580c;
+    --ll-accent-soft: rgba(234, 88, 12, 0.12);
+
+    /* 语义色 */
+    --ll-success: #16a34a;
+    --ll-warning: #d97706;
+    --ll-danger: #dc2626;
+    --ll-info: #0284c7;
+
+    /* 图表系列色（配合内联 style 使用，SVG 属性不支持 var()） */
+    --ll-chart-primary: #0d9488;
+    --ll-chart-secondary: #94a3b8;
+
+    /* 表面与文字 —— 跟随 Obsidian 主题 */
+    --ll-surface: var(--background-primary);
+    --ll-surface-2: var(--background-secondary);
+    --ll-surface-3: var(--background-secondary-alt);
+    --ll-border: var(--background-modifier-border);
+    --ll-border-strong: var(--background-modifier-border-hover);
+    --ll-hover: var(--background-modifier-hover);
+    --ll-text: var(--text-normal);
+    --ll-text-2: var(--text-muted);
+    --ll-text-3: var(--text-faint);
+
+    /* 圆角 —— 方形圆角刻度（仅作轻微倒角，禁止胶囊/椭圆造型；
+       full 只允许用于真正的圆形元素：状态圆点、头像） */
+    --ll-radius-xs: 2px;
+    --ll-radius-sm: 3px;
+    --ll-radius-md: 4px;
+    --ll-radius-lg: 6px;
+    --ll-radius-full: 999px;
+
+    /* 间距 */
+    --ll-space-1: 4px;
+    --ll-space-2: 8px;
+    --ll-space-3: 12px;
+    --ll-space-4: 16px;
+    --ll-space-5: 24px;
+    --ll-space-6: 32px;
+
+    /* 动效 */
+    --ll-speed: 180ms;
+    --ll-speed-slow: 280ms;
+    --ll-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* 阴影（扁平风格仅保留层级提示） */
+    --ll-shadow-1: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --ll-shadow-2: 0 4px 14px rgba(15, 23, 42, 0.14);
+}
+
+.theme-dark {
+    --ll-primary: #2dd4bf;
+    --ll-primary-strong: #5eead4;
+    --ll-primary-suppl: #14b8a6;
+    --ll-primary-soft: rgba(45, 212, 191, 0.16);
+    --ll-accent: #fb923c;
+    --ll-accent-soft: rgba(251, 146, 60, 0.16);
+
+    --ll-success: #4ade80;
+    --ll-warning: #fbbf24;
+    --ll-danger: #f87171;
+    --ll-info: #38bdf8;
+
+    --ll-chart-primary: #2dd4bf;
+    --ll-chart-secondary: #94a3b8;
+
+    --ll-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --ll-shadow-2: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* 无障碍：尊重系统减弱动态效果设置 */
+@media (prefers-reduced-motion: reduce) {
+    #langr-data,
+    #langr-data *,
+    #langr-reading,
+    #langr-reading * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

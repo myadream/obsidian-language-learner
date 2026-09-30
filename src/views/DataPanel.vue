@@ -1,99 +1,190 @@
 <template>
     <div id="langr-data">
-        <NConfigProvider :theme="theme" :theme-overrides="themeConfig.value">
+        <NConfigProvider :theme="theme" :theme-overrides="themeConfig">
             <NMessageProvider>
-                <!-- 操作按钮 -->
-                <ActionButtons
-                :has-active-filters="hasActiveFilters"
-                @add-word="onAddWord"
-                @refresh="refresh"
-                @reset-filters="resetFilters"
-                @export="handleExport"
-            />
+                <!-- 顶部命令条：搜索 / 排序 / 操作 -->
+                <header class="command-strip">
+                    <!-- 窄屏（右侧边栏）下折叠/展开筛选轨 -->
+                    <button
+                        type="button"
+                        class="rail-toggle"
+                        :class="{ active: railOpen }"
+                        :aria-expanded="railOpen"
+                        :title="t('Filters')"
+                        :aria-label="t('Filters')"
+                        @click="railOpen = !railOpen"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                        </svg>
+                    </button>
 
-            <!-- 搜索和筛选面板 -->
-            <div class="search-section">
-                <SearchFilterPanel
-                    v-model="searchParams"
-                    :status-options="statusOptions"
-                    :type-options="typeOptions"
-                    @search="onSearchChange"
-                />
-            </div>
+                    <SearchFilterPanel
+                        v-model="searchParams"
+                        @search="onSearchChange"
+                    />
 
-            <!-- 标签筛选 -->
-            <div class="tag-section">
-                <TagFilter
-                    v-model:checked-tags="checkedTags"
-                    v-model:mode="mode"
-                    :tags="tags"
-                />
-            </div>
-
-            <!-- 加载状态 -->
-            <div class="content-container scroll-container" ref="scrollContainer">
-                <NSpin :show="loading">
-                    <!-- 错误状态 -->
-                    <div v-if="!loading && error" class="empty-state">
-                        <div class="empty-icon">❌</div>
-                        <div class="empty-description">{{ error }}</div>
-                        <div class="empty-actions">
-                            <NSpace>
-                                <NButton type="primary" @click="retryLoad">
-                                    {{ t("Retry") }}
-                                </NButton>
-                                <NButton @click="resetFilters">
-                                    {{ t("Reset Filters") }}
-                                </NButton>
-                            </NSpace>
-                        </div>
+                    <div class="cmd-sort">
+                        <span class="cmd-sort-label">{{ t("Sort") }}</span>
+                        <NSelect
+                            :value="sortValue"
+                            :options="sortOptions"
+                            size="small"
+                            :consistent-menu-width="false"
+                            @update:value="onSortChange"
+                        />
                     </div>
 
-                    <!-- 空状态 -->
-                    <div v-else-if="!loading && filteredData.length === 0" class="empty-state">
-                        <div class="empty-icon">📚</div>
-                        <div class="empty-description">
-                            {{ data.length === 0 ? t('No words found. Try adjusting your filters.') : t('No words match the selected tags.') }}
-                        </div>
-                        <div class="empty-actions" v-if="hasActiveFilters">
-                            <NButton @click="resetFilters">
+                    <ActionButtons
+                        :has-active-filters="hasAnyFilter"
+                        @add-word="onAddWord"
+                        @refresh="refresh"
+                        @reset-filters="resetFilters"
+                        @export="handleExport"
+                    />
+                </header>
+
+                <!-- 主体：左筛选轨 + 右数据区 -->
+                <div class="panel-body" :class="{ 'rail-open': railOpen }">
+                    <aside class="filter-rail">
+                        <section class="rail-section">
+                            <div class="rail-title">{{ t("Status") }}</div>
+                            <div class="rail-status-list">
+                                <button
+                                    type="button"
+                                    class="rail-status-item"
+                                    :class="{ active: searchParams.status === undefined }"
+                                    @click="setStatus(undefined)"
+                                >
+                                    <span class="lbl">{{ t("All") }}</span>
+                                </button>
+                                <button
+                                    v-for="(label, idx) in statusMap"
+                                    :key="idx"
+                                    type="button"
+                                    class="rail-status-item"
+                                    :class="[`s-${statusClass(idx)}`, { active: searchParams.status === idx }]"
+                                    @click="setStatus(idx)"
+                                >
+                                    <span class="dot" aria-hidden="true"></span>
+                                    <span class="lbl">{{ label }}</span>
+                                    <svg v-if="searchParams.status === idx" class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="rail-section">
+                            <div class="rail-title">{{ t("Type") }}</div>
+                            <NSelect
+                                :value="searchParams.t"
+                                @update:value="setType"
+                                :options="typeOptions"
+                                size="small"
+                                :consistent-menu-width="false"
+                            />
+                        </section>
+
+                        <section class="rail-section rail-tags">
+                            <TagFilter
+                                v-model:checked-tags="checkedTags"
+                                v-model:mode="mode"
+                                :tags="tags"
+                            />
+                        </section>
+
+                        <div v-if="hasAnyFilter" class="rail-footer">
+                            <NButton size="small" dashed block @click="resetFilters">
                                 {{ t("Reset Filters") }}
                             </NButton>
                         </div>
-                    </div>
+                    </aside>
 
-                    <!-- 卡片列表视图 -->
-                    <div v-else class="card-list-section">
-                    <!-- 筛选结果提示 -->
-                    <div v-if="filteredData.length !== data.length" class="filter-info">
-                        <NText>
-                            {{ t("Showing {0} of {1} words", filteredData.length, data.length) }}
-                        </NText>
-                    </div>
+                    <main class="list-pane scroll-container" ref="scrollContainer">
+                        <NSpin :show="loading">
+                            <!-- 错误状态 -->
+                            <div v-if="!loading && error" class="pane-state">
+                                <div class="state-icon is-error">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                </div>
+                                <div class="state-title">{{ t("Something went wrong") }}</div>
+                                <div class="state-description">{{ error }}</div>
+                                <div class="state-actions">
+                                    <NButton type="primary" @click="retryLoad">
+                                        {{ t("Retry") }}
+                                    </NButton>
+                                    <NButton @click="resetFilters">
+                                        {{ t("Reset Filters") }}
+                                    </NButton>
+                                </div>
+                            </div>
 
-                    <WordCardList
-                        :data="data"
-                        @edit="handleEditWord"
-                    />
+                            <!-- 空状态 -->
+                            <div v-else-if="!loading && filteredData.length === 0" class="pane-state">
+                                <div class="state-icon">
+                                    <svg v-if="data.length === 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                        <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+                                        <path d="M3 12A9 3 0 0 0 21 12" />
+                                    </svg>
+                                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                        <line x1="8.5" y1="8.5" x2="13.5" y2="13.5" />
+                                        <line x1="13.5" y1="8.5" x2="8.5" y2="13.5" />
+                                    </svg>
+                                </div>
+                                <div class="state-title">
+                                    {{ data.length === 0 ? t("No words yet") : t("No matching words") }}
+                                </div>
+                                <div class="state-description">
+                                    {{ data.length === 0 ? t("Start by adding your first word.") : t("No words match the selected tags.") }}
+                                </div>
+                                <div class="state-actions">
+                                    <NButton v-if="data.length === 0" type="primary" @click="onAddWord">
+                                        {{ t("Learning New Words") }}
+                                    </NButton>
+                                    <NButton v-if="hasAnyFilter" @click="resetFilters">
+                                        {{ t("Reset Filters") }}
+                                    </NButton>
+                                </div>
+                            </div>
 
-                    <!-- 加载更多提示 -->
-                    <div v-if="!loading && hasMore && data.length > 0" class="load-more-section">
-                        <NSpin :show="loadingMore" size="small">
-                            <div class="load-more-text">
-                                {{ loadingMore ? t("Loading...") : t("Scroll down to load more") }}
+                            <!-- 数据区 -->
+                            <div v-else class="ledger-section">
+                                <div class="pane-meta">
+                                    <span class="meta-text">
+                                        {{ t("Showing {0} of {1} words", data.length, totalCount) }}
+                                    </span>
+                                </div>
+
+                                <WordCardList
+                                    :data="data"
+                                    @edit="handleEditWord"
+                                />
+
+                                <div v-if="!loading && hasMore && data.length > 0" class="load-more-section">
+                                    <NSpin :show="loadingMore" size="small">
+                                        <div class="load-more-text">
+                                            {{ loadingMore ? t("Loading...") : t("Scroll down to load more") }}
+                                        </div>
+                                    </NSpin>
+                                </div>
+
+                                <div v-if="!loading && !hasMore && data.length > 0" class="no-more-section">
+                                    <NText depth="3">
+                                        {{ t("No more data") }}
+                                    </NText>
+                                </div>
                             </div>
                         </NSpin>
-                    </div>
-
-                    <!-- 没有更多数据提示 -->
-                    <div v-if="!loading && !hasMore && data.length > 0" class="no-more-section">
-                        <NText depth="3">
-                            {{ t("No more data") }}
-                        </NText>
-                    </div>
+                    </main>
                 </div>
-            </NSpin>
-            </div>
             </NMessageProvider>
         </NConfigProvider>
 
@@ -114,10 +205,9 @@ import {
 import {
     NConfigProvider,
     NButton,
+    NSelect,
     NSpin,
-    NEmpty,
     NText,
-    NSpace,
     GlobalThemeOverrides,
     darkTheme,
     NMessageProvider,
@@ -126,7 +216,8 @@ import {t} from "@/lang/helper";
 
 import type PluginType from "@/plugin";
 import LearnPanelModal from "@/views/LearnPanelModal.vue";
-import { StatusColorMap } from "@/statusColors";
+import { getThemeOverrides } from "@/styles/theme";
+import { StatusClassMap } from "@/statusColors";
 
 // 导入拆分的子组件
 import ActionButtons from "@/component/DataPanel/ActionButtons.vue";
@@ -137,12 +228,9 @@ import WordCardList from "@/component/DataPanel/WordCardList.vue";
 const plugin = getCurrentInstance().appContext.config.globalProperties
     .plugin as PluginType;
 
-const themeConfig = computed<GlobalThemeOverrides>(() => ({
-    // 统一字体大小
-    common: {
-        fontSize: '14px',
-    },
-}));
+const themeConfig = computed<GlobalThemeOverrides>(() =>
+    getThemeOverrides(plugin.store.dark)
+);
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -152,6 +240,7 @@ const loadingMore = ref(false);
 const currentPage = ref(0);
 const pageSize = ref(20);
 const hasMore = ref(true); // 是否还有更多数据
+const totalCount = ref(0); // 服务器端符合条件的总数（含未加载页）
 
 // 用户偏好设置的键名
 const PREFS_KEY = 'datapanel-prefs';
@@ -180,8 +269,9 @@ const loadPrefs = () => {
         if (saved) {
             const prefs = JSON.parse(saved);
             if (prefs.sort?.field && prefs.sort?.order) {
-                sortParams.value.field = prefs.sort.field;
-                sortParams.value.order = prefs.sort.order;
+                // 旧偏好可能存有已移除的状态排序，统一回落到日期
+                sortParams.value.field = 'date';
+                sortParams.value.order = prefs.sort.order === 'asc' ? 'asc' : 'desc';
             }
             if (prefs.search) {
                 searchParams.value = {
@@ -224,18 +314,23 @@ const statusMap = [
     t("Learned"),
 ];
 
-// 状态下拉选项
-const statusOptions = computed(() => [
-    { label: "All", value: undefined },
-    ...statusMap.map((status, index) => ({ label: status, value: index }))
-]);
+// 状态 → CSS 类名（颜色由 --status-* 变量提供）
+const statusClass = (statusIndex: number) => {
+    return StatusClassMap[statusIndex] || 'ignore';
+};
 
-// 类型下拉选项
+// 类型选项（筛选轨分段按钮）
 const typeOptions = [
-    { label: "All", value: undefined },
-    { label: "Word", value: "WORD" },
-    { label: "Phrase", value: "PHRASE" }
+    { label: t("All"), value: undefined },
+    { label: t("Word"), value: "WORD" },
+    { label: t("Phrase"), value: "PHRASE" }
 ];
+
+// 排序选项（仅按日期；状态排序已移除）
+const sortOptions = computed(() => [
+    { label: t("Newest first"), value: "date:desc" },
+    { label: t("Oldest first"), value: "date:asc" },
+]);
 
 // 搜索和筛选状态
 const searchParams = ref({
@@ -245,11 +340,16 @@ const searchParams = ref({
     t: undefined as string | undefined
 });
 
-// 排序状态
+// 排序状态（仅支持按日期先后）
 const sortParams = ref({
-    field: 'date' as 'status' | 'date',
+    field: 'date' as const,
     order: 'desc' as 'asc' | 'desc'
 });
+
+// 窄屏（右侧边栏停靠）下筛选轨的展开状态
+const railOpen = ref(false);
+
+const sortValue = computed(() => `${sortParams.value.field}:${sortParams.value.order}`);
 
 // 改变显示新增显示状态
 const onChangeShow = (state: boolean) => {
@@ -279,25 +379,33 @@ const handleEditWord = async (item: Row) => {
     showWordModal.value = true;
 };
 
-// 重置搜索和筛选
-const resetFilters = () => {
-    searchParams.value = {
-        expression: '',
-        meaning: '',
-        status: undefined,
-        t: undefined
-    };
-    sortParams.value = {
-        field: 'date',
-        order: 'desc'
-    };
-    currentPage.value = 0;
-    data.value = [];
-    hasMore.value = true;
-    expressions();
-}
+const emptySearch = () => ({
+    expression: '',
+    meaning: '',
+    status: undefined,
+    t: undefined
+});
 
-// 检查是否有激活的筛选条件（优化：移除不必要的 !! 转换）
+// 重置搜索和筛选（含标签）
+const resetFilters = () => {
+    const tagsWillChange = selectedTags.value.length > 0;
+    const searchChanged =
+        hasActiveFilters.value ||
+        sortParams.value.field !== 'date' ||
+        sortParams.value.order !== 'desc';
+
+    searchParams.value = emptySearch();
+    sortParams.value = { field: 'date', order: 'desc' };
+    checkedTags.value = tags.value.map(() => false);
+    savePrefs();
+
+    // 标签变化会经下方 watch 触发重查；仅搜索/排序变化时这里手动重查
+    if (!tagsWillChange && searchChanged) {
+        refetchFromFirstPage();
+    }
+};
+
+// 检查是否有激活的搜索/筛选条件
 const hasActiveFilters = computed(() => {
     return Boolean(
         searchParams.value.expression ||
@@ -307,41 +415,49 @@ const hasActiveFilters = computed(() => {
     );
 });
 
+// 含标签在内的全部筛选条件（驱动命令条与筛选轨的重置按钮）
+const hasAnyFilter = computed(() => hasActiveFilters.value || selectedTags.value.length > 0);
+
+// 筛选轨：状态 / 类型
+const setStatus = (idx: number | undefined) => {
+    if (searchParams.value.status === idx) return;
+    searchParams.value.status = idx;
+    savePrefs();
+    refetchFromFirstPage();
+};
+
+const setType = (value: string | undefined) => {
+    if (searchParams.value.t === value) return;
+    searchParams.value.t = value;
+    savePrefs();
+    refetchFromFirstPage();
+};
+
 // 搜索变化处理（防抖已在 SearchFilterPanel 中处理）
 const onSearchChange = () => {
+    savePrefs();
+    refetchFromFirstPage();
+};
+
+const refetchFromFirstPage = () => {
     currentPage.value = 0;
     data.value = [];
     hasMore.value = true;
-    savePrefs(); // 保存偏好
     expressions();
 };
 
-// 处理排序
-const handleSort = async (field: 'status' | 'date') => {
-    console.log('Sorting by:', field, 'current params:', sortParams.value);
-
-    if (sortParams.value.field === field) {
-        // 切换排序方向
-        sortParams.value.order = sortParams.value.order === 'asc' ? 'desc' : 'asc';
-    } else {
-        // 新字段，默认降序
-        sortParams.value.field = field;
-        sortParams.value.order = 'desc';
-    }
-
-    currentPage.value = 0;
-    data.value = [];
-    hasMore.value = true;
-    console.log('After sort:', sortParams.value);
-
-    savePrefs(); // 保存偏好
-
-    // 强制重新加载数据
-    await expressions();
+// 排序变化
+const onSortChange = (value: string) => {
+    const [field, order] = value.split(':') as ['date', 'asc' | 'desc'];
+    if (sortParams.value.field === field && sortParams.value.order === order) return;
+    sortParams.value.field = field;
+    sortParams.value.order = order;
+    savePrefs();
+    refetchFromFirstPage();
 };
 
 // 兼容文件同步后的数据库未重新打开读取数据问题
-const refresh = async () => { 
+const refresh = async () => {
     if (loading.value) {
         return;
     }
@@ -432,7 +548,8 @@ const expressions = async () => {
             data.value = [...data.value, ...newData];
         }
 
-        // 更新 hasMore 状态
+        // 更新总数与 hasMore 状态
+        totalCount.value = response.total;
         hasMore.value = data.value.length < response.total;
 
         // 只加载一次标签集（即使为空）。
@@ -575,10 +692,7 @@ const filteredData = computed(() => {
 watch([selectedTags, mode], () => {
     if (!ready) return;
     // 标签筛选改变时重置并重新加载
-    currentPage.value = 0;
-    data.value = [];
-    hasMore.value = true;
-    expressions();
+    refetchFromFirstPage();
 }, { deep: true });
 
 // 防抖函数
@@ -652,81 +766,278 @@ watch(scrollContainer, (newContainer) => {
 
 <style lang="scss">
 #langr-data {
-    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
 
-    .search-section,
-    .tag-section {
-        margin-bottom: 16px;
+    // ── 顶部命令条 ───────────────────────────────────────────
+    .command-strip {
+        display: flex;
+        align-items: center;
+        gap: var(--ll-space-2);
+        flex-wrap: wrap;
+        padding: var(--ll-space-2) var(--ll-space-4);
+        background: var(--ll-surface);
+        border-bottom: 1px solid var(--ll-border);
+        flex-shrink: 0;
+
+        // 筛选轨折叠按钮：仅窄屏显示
+        .rail-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            border: 1px solid var(--ll-border);
+            border-radius: var(--ll-radius-sm);
+            background: var(--ll-surface);
+            color: var(--ll-text-2);
+            cursor: pointer;
+            transition: color var(--ll-speed) var(--ll-ease),
+                border-color var(--ll-speed) var(--ll-ease),
+                background-color var(--ll-speed) var(--ll-ease);
+
+            svg {
+                width: 14px;
+                height: 14px;
+                display: block;
+            }
+
+            &:hover {
+                color: var(--ll-text);
+                background: var(--ll-hover);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--ll-primary);
+                outline-offset: 1px;
+            }
+
+            &.active {
+                color: var(--ll-primary-strong);
+                border-color: var(--ll-primary);
+                background: var(--ll-primary-soft);
+            }
+        }
+
+        .cmd-sort {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+
+            .cmd-sort-label {
+                font-size: 12px;
+                color: var(--ll-text-3);
+                white-space: nowrap;
+            }
+
+            .n-select {
+                min-width: 128px;
+            }
+        }
     }
 
-    // 内容容器
-    .content-container {
-        min-height: 400px;
-        max-height: calc(100vh - 350px);
+    // ── 主体：筛选轨 + 数据区 ────────────────────────────────
+    .panel-body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .filter-rail {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        width: 216px;
         overflow-y: auto;
+        background: var(--ll-surface-2);
+        border-right: 1px solid var(--ll-border);
+
+        .rail-section {
+            padding: var(--ll-space-3) var(--ll-space-3) var(--ll-space-2);
+
+            & + .rail-section {
+                border-top: 1px solid var(--ll-border);
+            }
+        }
+
+        .rail-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--ll-text-3);
+            margin-bottom: var(--ll-space-2);
+        }
+
+        .rail-status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rail-status-item {
+            display: flex;
+            align-items: center;
+            gap: var(--ll-space-2);
+            width: 100%;
+            padding: 5px var(--ll-space-2);
+            border: none;
+            border-radius: var(--ll-radius-sm);
+            background: transparent;
+            color: var(--ll-text-2);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color var(--ll-speed) var(--ll-ease),
+                color var(--ll-speed) var(--ll-ease);
+
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--ll-text-3);
+                flex-shrink: 0;
+            }
+
+            .lbl {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .check {
+                width: 13px;
+                height: 13px;
+                flex-shrink: 0;
+            }
+
+            &:hover {
+                background: var(--ll-hover);
+                color: var(--ll-text);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--ll-primary);
+                outline-offset: -2px;
+            }
+
+            &.active {
+                background: var(--ll-primary-soft);
+                color: var(--ll-primary-strong);
+                font-weight: 600;
+            }
+
+            // 各状态选中态：圆点与文字取状态色
+            @each $s in ignore learning familiar known learned {
+                &.s-#{$s} .dot {
+                    background: var(--status-#{$s}-main);
+                }
+
+                &.s-#{$s}.active {
+                    color: var(--status-#{$s}-main);
+                    background: var(--status-#{$s}-bg);
+                }
+            }
+        }
+
+        .rail-tags {
+            flex: 1;
+        }
+
+        .rail-footer {
+            padding: var(--ll-space-3);
+            border-top: 1px solid var(--ll-border);
+            margin-top: auto;
+        }
     }
 
-    // 滚动容器
-    .scroll-container {
+    // ── 数据区 ──────────────────────────────────────────────
+    .list-pane {
+        flex: 1;
+        min-width: 0;
+        overflow-y: auto;
         position: relative;
+        background: var(--ll-surface);
     }
 
-    // 自定义空状态样式
-    .empty-state {
+    .pane-meta {
+        padding: var(--ll-space-2) var(--ll-space-4);
+        border-bottom: 1px solid var(--ll-border);
+
+        .meta-text {
+            font-size: 12px;
+            color: var(--ll-text-3);
+            font-variant-numeric: tabular-nums;
+        }
+    }
+
+    // 空 / 错误状态：方形图标块（内容优先，弱装饰）
+    .pane-state {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 80px 20px;
+        padding: 72px 20px;
         text-align: center;
 
-        .empty-icon {
-            font-size: 64px;
-            line-height: 1;
-            margin-bottom: 24px;
-            display: block;
+        .state-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            margin-bottom: var(--ll-space-4);
+            border-radius: var(--ll-radius-md);
+            color: var(--ll-primary);
+            background: var(--ll-primary-soft);
+
+            svg {
+                width: 26px;
+                height: 26px;
+            }
+
+            &.is-error {
+                color: var(--ll-danger);
+                background: transparent;
+                border: 1px solid var(--ll-danger);
+            }
         }
 
-        .empty-description {
-            font-size: 16px;
+        .state-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--ll-text);
+            margin-bottom: var(--ll-space-2);
+        }
+
+        .state-description {
+            font-size: 13px;
             line-height: 1.6;
-            color: var(--n-text-color-2);
-            margin-bottom: 32px;
-            max-width: 500px;
+            color: var(--ll-text-3);
+            margin-bottom: var(--ll-space-5);
+            max-width: 420px;
         }
 
-        .empty-actions {
+        .state-actions {
             display: flex;
             justify-content: center;
-            gap: 12px;
+            gap: var(--ll-space-3);
         }
     }
 
-    .card-list-section {
-        margin-top: 16px;
-
-        .filter-info {
-            padding: 8px 12px;
-            background: var(--n-color-modal);
-            border-radius: 4px;
-            margin-bottom: 12px;
-            text-align: center;
-            font-size: 0.9em;
-            color: var(--n-text-color-2);
-        }
-    }
-
-    // 加载更多部分
+    // 加载更多
     .load-more-section {
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 20px;
-        margin-top: 16px;
+        padding: var(--ll-space-4);
 
         .load-more-text {
-            font-size: 14px;
-            color: var(--n-text-color-2);
+            font-size: 13px;
+            color: var(--ll-text-3);
             text-align: center;
         }
     }
@@ -735,10 +1046,51 @@ watch(scrollContainer, (newContainer) => {
     .no-more-section {
         display: flex;
         justify-content: center;
-        padding: 20px;
-        margin-top: 16px;
-        font-size: 14px;
-        color: var(--n-text-color-3);
+        padding: var(--ll-space-4);
+        font-size: 13px;
+        color: var(--ll-text-3);
+    }
+
+    // ── 窄屏：视图可能停靠在右侧边栏（约 300px 宽），
+    //    筛选轨折叠进命令条按钮，数据区独占宽度 ─────────────────
+    @media (max-width: 760px) {
+        .command-strip .rail-toggle {
+            display: flex;
+        }
+
+        .panel-body {
+            flex-direction: column;
+            overflow-y: auto;
+
+            // 折叠态：隐藏筛选轨
+            .filter-rail {
+                display: none;
+            }
+
+            // 展开态：筛选轨转为顶部横排块
+            &.rail-open .filter-rail {
+                display: flex;
+                width: auto;
+                flex-shrink: 0;
+                max-height: 50vh;
+                overflow: visible;
+                border-right: none;
+                border-bottom: 1px solid var(--ll-border);
+
+                .rail-status-list {
+                    flex-direction: row;
+                    flex-wrap: wrap;
+                }
+
+                .rail-status-item {
+                    width: auto;
+                }
+            }
+        }
+
+        .list-pane {
+            overflow: visible;
+        }
     }
 }
 </style>

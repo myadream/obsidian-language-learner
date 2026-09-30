@@ -1,7 +1,5 @@
 import {moment} from "obsidian";
 import {createAutomaton} from "ac-auto";
-import {exportDB, importInto} from "dexie-export-import";
-import download from "downloadjs";
 
 import {
     ArticleWords,
@@ -19,6 +17,7 @@ import {
 import WordDB from "./idb";
 import Plugin from "@/plugin";
 import StorageDrive, {Paginate, PaginateResult, SortParams} from "@/storage/drive";
+import { toUnixSeconds } from "@/storage/utils";
 import { ExpressionsTable } from "../types";
 
 export class IndexedStorageDrive extends StorageDrive {
@@ -82,7 +81,7 @@ export class IndexedStorageDrive extends StorageDrive {
             notes: expr.notes as string[],
             sentences,
             tags: expr.tags,
-            connections: [],
+            connections: (expr.connections as string[]) ?? [],
             date: expr.date,
         };
 
@@ -285,7 +284,7 @@ export class IndexedStorageDrive extends StorageDrive {
         };
     }
 
-    async postExpression(payload: ExpressionInfo): Promise<number> {
+    async postExpression(payload: ExpressionInfo, date = moment().unix()): Promise<number> {
         const stored = await this.idb.expressions
             .where("expression").equals(payload.expression)
             .first();
@@ -306,7 +305,7 @@ export class IndexedStorageDrive extends StorageDrive {
                     sentence: sen.sentence,
                     trans: sen.trans || '',
                     origin: sen.origin || '',
-                    date: moment().unix(),
+                    date,
                 });
                 sentenceIds.add(existing._id as number);
             } else {
@@ -316,7 +315,7 @@ export class IndexedStorageDrive extends StorageDrive {
                     sentence: sen.sentence,
                     trans: sen.trans || '',
                     origin: sen.origin || '',
-                    date: moment().unix(),
+                    date,
                 };
                 const id = await this.idb.sentences.add(newSen);
                 sentenceIds.add(id);
@@ -345,7 +344,7 @@ export class IndexedStorageDrive extends StorageDrive {
             sentences: [...sentenceIds.values()],
             tags: [...new Set<string>(payload.tags || [])],
             connections: payload.connections || [],
-            date: moment().unix(),
+            date,
         };
 
         if (stored) {
@@ -465,34 +464,54 @@ export class IndexedStorageDrive extends StorageDrive {
         return res;
     }
 
-    async importDB(data: File, format: 'json' | 'csv' | 'sqlite3') {
-        if (format === 'sqlite3') {
-            // SQLite3 格式：暂不支持导入到 IndexedDB
-            throw new Error('Importing SQLite3 database to IndexedDB is not supported. Please export your data from the source in JSON format instead.');
-        } else if (format === 'json' || format === 'csv') {
-            // JSON 或 CSV 格式：使用 Dexie 的导入功能（仅支持 IndexedDB 导出的 JSON 格式）
-            if (format === 'csv') {
-                throw new Error('Importing CSV to IndexedDB is not directly supported. Please use JSON format or switch to SQLite3 storage.');
-            }
+    // ---- 导入导出（文件格式在外层 transfer.ts 统一处理，驱动只面对数据） ----
 
-            // JSON 格式（IndexedDB 导出格式）
-            await this.idb.delete();
-            await this.idb.open();
-            await importInto(this.idb, data, {
-                acceptNameDiff: true
-            });
-        } else {
-            throw new Error(`Unsupported format: ${format}`);
-        }
+    /** 全量导出为统一数据结构：词条内嵌的 tags/notes 直接带出，句子按 _id 联表 */
+    async exportData(): Promise<ExpressionInfo[]> {
+        const [exprs, sentences] = await Promise.all([
+            this.idb.expressions.toArray(),
+            this.idb.sentences.toArray(),
+        ]);
+        const sentenceById = new Map(sentences.map((s) => [s._id, s]));
+
+        return exprs.map((expr) => ({
+            expression: expr.expression,
+            meaning: expr.meaning,
+            status: expr.status,
+            t: expr.t,
+            tags: [...(expr.tags ?? [])],
+            notes: [...(expr.notes ?? [])],
+            sentences: ((expr.sentences ?? []) as any[])
+                .map((id) => sentenceById.get(id))
+                .filter(Boolean)
+                .map((s) => ({
+                    expression: s.expression,
+                    sentence: s.sentence,
+                    trans: s.trans,
+                    origin: s.origin,
+                    date: s.date,
+                })),
+            connections: [...(expr.connections ?? [])],
+            date: expr.date,
+        }));
     }
 
-    async exportDB() {
-        const blob = await exportDB(this.idb);
-        try {
-            download(blob, `${this.idb.storageName}.json`, "application/json");
-        } catch (e) {
-            console.error("error exporting database", e);
-        }
+    /** 清空重建导入：与历史导入语义一致（完整恢复），保留数据自带的原始时间 */
+    async importData(items: ExpressionInfo[]): Promise<void> {
+        await this.idb.delete();
+        await this.idb.open();
+
+        await this.idb.transaction(
+            "rw",
+            this.idb.expressions,
+            this.idb.sentences,
+            async () => {
+                for (const item of items) {
+                    if (!item?.expression) continue;
+                    await this.postExpression(item, toUnixSeconds(item.date));
+                }
+            }
+        );
     }
 
     async destroyAll() {

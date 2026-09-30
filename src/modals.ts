@@ -153,7 +153,7 @@ class ImportFormatModal extends Modal {
         // Format descriptions
         const formatDescEl = contentEl.createDiv({
             attr: {
-                style: 'margin: 10px 0; padding: 10px; background: var(--background-secondary); border-radius: 5px;'
+                style: 'margin: 10px 0; padding: 10px; background: var(--background-secondary); border-radius: 3px;'
             }
         });
 
@@ -238,4 +238,68 @@ class ImportFormatModal extends Modal {
     }
 }
 
-export { OpenFileModal, WarningModal, InputModal, ImportFormatModal };
+// Export format selection modal（导出格式统一在外层 transfer.ts 处理，这里只选格式）
+class ExportFormatModal extends Modal {
+    selectedFormat: 'json' | 'csv' = 'json';
+    onSubmit: (format: 'json' | 'csv') => Promise<void>;
+
+    constructor(app: App, onSubmit: (format: 'json' | 'csv') => Promise<void>) {
+        super(app);
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+
+        contentEl.createEl('h3', { text: t('Export to File') });
+
+        new Setting(contentEl)
+            .setName(t('Export Format'))
+            .setDesc(t('Select the format of the file to export'))
+            .addDropdown(dropdown => dropdown
+                .addOption('json', 'JSON')
+                .addOption('csv', 'CSV')
+                .setValue('json')
+                .onChange((value: 'json' | 'csv') => {
+                    this.selectedFormat = value;
+                    updateFormatDesc();
+                })
+            );
+
+        const formatDescEl = contentEl.createDiv({
+            attr: {
+                style: 'margin: 10px 0; padding: 10px; background: var(--background-secondary); border-radius: 3px;'
+            }
+        });
+
+        const updateFormatDesc = () => {
+            formatDescEl.empty();
+            const desc = this.selectedFormat === 'csv'
+                ? t('CSV format: Expression,Meaning,Status,Type,Tags,Date (words only, no notes/sentences)')
+                : t('JSON format: Full data including words, meanings, statuses, tags, notes, sentences and connections. Recommended for backup and switching storage types.');
+            formatDescEl.createEl('p', { text: desc });
+        };
+
+        updateFormatDesc();
+
+        new Setting(contentEl)
+            .addButton(button => button
+                .setButtonText(t('Export'))
+                .setCta()
+                .onClick(async () => {
+                    this.close();
+                    await this.onSubmit(this.selectedFormat);
+                })
+            )
+            .addButton(button => button
+                .setButtonText(t('Cancel'))
+                .onClick(() => this.close()));
+    }
+
+    onClose(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+export { OpenFileModal, WarningModal, InputModal, ImportFormatModal, ExportFormatModal };

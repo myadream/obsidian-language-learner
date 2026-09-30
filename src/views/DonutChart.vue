@@ -5,13 +5,12 @@
             <!-- 环形 SVG 容器 -->
             <div class="donut-svg-wrapper">
                 <svg class="donut-svg" viewBox="0 0 100 100">
-                    <!-- 背景底环 -->
-                    <circle cx="50" cy="50" :r="radius" fill="none" stroke="var(--background-modifier-border, rgba(128, 128, 128, 0.15))"
-                        :stroke-width="strokeWidth" />
+                    <!-- 背景底环（内联 style 支持 CSS 变量） -->
+                    <circle cx="50" cy="50" r="38" fill="none" class="donut-track" :stroke-width="strokeWidth" />
 
-                    <!-- 扇区切片 -->
-                    <circle v-for="(slice, idx) in slices" :key="`slice-${idx}`" cx="50" cy="50" :r="radius" fill="none"
-                        :stroke="slice.color" :stroke-width="hoverIndex === idx ? strokeWidth + 3 : strokeWidth"
+                    <!-- 扇区切片（颜色经内联 style 传入以支持 CSS 变量） -->
+                    <circle v-for="(slice, idx) in slices" :key="`slice-${idx}`" cx="50" cy="50" r="38" fill="none"
+                        :style="{ stroke: slice.color }" :stroke-width="hoverIndex === idx ? strokeWidth + 3 : strokeWidth"
                         :stroke-dasharray="`${slice.dashLength} ${circumference - slice.dashLength}`"
                         :stroke-dashoffset="slice.dashOffset"
                         class="donut-segment"
@@ -117,18 +116,22 @@ const displayLabel = computed(() => {
 
 <style lang="scss">
 .donut-chart-card {
-    background-color: var(--background-secondary, #ffffff);
-    border: 1px solid var(--background-modifier-border, rgba(128, 128, 128, 0.18));
-    border-radius: var(--radius-m, 8px);
-    padding: 8px 10px;
+    background-color: var(--ll-surface-2);
+    border: 1px solid var(--ll-border);
+    border-radius: var(--ll-radius-md);
+    padding: var(--ll-space-3) var(--ll-space-3);
     width: 100%;
     box-sizing: border-box;
 
     .card-title {
-        margin: 0 0 6px 0;
+        margin: 0 0 var(--ll-space-2) 0;
         font-size: 0.88em;
         font-weight: 600;
-        color: var(--text-normal);
+        color: var(--ll-text);
+    }
+
+    .donut-track {
+        stroke: var(--ll-border);
     }
 
     .donut-chart-body {
@@ -176,13 +179,13 @@ const displayLabel = computed(() => {
             .center-val {
                 font-size: 0.9em;
                 font-weight: 700;
-                color: var(--text-normal);
+                color: var(--ll-text);
                 line-height: 1.1;
             }
 
             .center-label {
                 font-size: 0.7em;
-                color: var(--text-muted);
+                color: var(--ll-text-2);
                 margin-top: 1px;
             }
         }
@@ -200,7 +203,7 @@ const displayLabel = computed(() => {
             display: flex;
             align-items: center;
             padding: 2px 4px;
-            border-radius: 4px;
+            border-radius: var(--ll-radius-xs);
             cursor: pointer;
             transition: background-color 0.15s ease;
             width: 100%;
@@ -208,7 +211,7 @@ const displayLabel = computed(() => {
 
             &:hover,
             &.active {
-                background-color: var(--background-modifier-hover);
+                background-color: var(--ll-hover);
             }
 
             .legend-dot {
@@ -222,7 +225,7 @@ const displayLabel = computed(() => {
             .legend-name {
                 flex: 1;
                 min-width: 0;
-                color: var(--text-muted);
+                color: var(--ll-text-2);
                 margin-right: 6px;
                 white-space: nowrap;
                 overflow: hidden;
@@ -231,7 +234,7 @@ const displayLabel = computed(() => {
 
             .legend-val {
                 font-weight: 600;
-                color: var(--text-normal);
+                color: var(--ll-text);
                 width: 48px;
                 text-align: right;
                 margin-right: 8px;
@@ -240,7 +243,7 @@ const displayLabel = computed(() => {
 
             .legend-pct {
                 font-size: 0.85em;
-                color: var(--text-muted);
+                color: var(--ll-text-2);
                 width: 48px;
                 text-align: right;
                 flex-shrink: 0;

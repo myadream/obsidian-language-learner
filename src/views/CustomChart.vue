@@ -6,11 +6,11 @@
         <div class="chart-svg-wrapper">
             <svg class="chart-svg" :viewBox="`0 0 ${containerWidth} ${svgHeight}`" preserveAspectRatio="none">
                 <defs>
-                    <!-- 渐变定义 -->
+                    <!-- 渐变定义（颜色经内联 style 传入以支持 CSS 变量） -->
                     <linearGradient v-for="(seriesItem, idx) in series" :key="`grad-${idx}`" :id="`chart-grad-${idx}`" x1="0"
                         y1="0" x2="0" y2="1">
-                        <stop offset="0%" :stop-color="seriesItem.color" stop-opacity="0.35" />
-                        <stop offset="100%" :stop-color="seriesItem.color" stop-opacity="0.02" />
+                        <stop offset="0%" :style="{ stopColor: seriesItem.color }" stop-opacity="0.35" />
+                        <stop offset="100%" :style="{ stopColor: seriesItem.color }" stop-opacity="0.02" />
                     </linearGradient>
                 </defs>
 
@@ -44,7 +44,7 @@
                 <!-- 曲线 Path (Line) -->
                 <g class="line-group">
                     <path v-for="(seriesItem, idx) in series" :key="`line-${idx}`"
-                        :d="getSmoothPath(getSeriesPoints(seriesItem.data))" fill="none" :stroke="seriesItem.color" stroke-width="2.5"
+                        :d="getSmoothPath(getSeriesPoints(seriesItem.data))" fill="none" :style="{ stroke: seriesItem.color }" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round" />
                 </g>
 
@@ -52,7 +52,7 @@
                 <g class="bullets-group">
                     <template v-for="(seriesItem, idx) in series" :key="`bullets-${idx}`">
                         <circle v-for="(point, pointIndex) in getSeriesPoints(seriesItem.data)" :key="`bullet-${idx}-${pointIndex}`"
-                            :cx="point.x" :cy="point.y" r="3.5" :fill="bulletBackgroundColor" :stroke="seriesItem.color" stroke-width="2.2" />
+                            :cx="point.x" :cy="point.y" r="3.5" :style="{ fill: bulletBackgroundColor, stroke: seriesItem.color }" stroke-width="2.2" />
                     </template>
                 </g>
 
@@ -63,7 +63,7 @@
                     <!-- 当前列的各系列高亮圈 -->
                     <circle v-for="(seriesItem, idx) in series" :key="`active-bullet-${idx}`"
                         :cx="getSeriesPoints(seriesItem.data)[activeIndex]?.x" :cy="getSeriesPoints(seriesItem.data)[activeIndex]?.y"
-                        r="5" :fill="seriesItem.color" stroke="#ffffff" stroke-width="2" />
+                        r="5" :style="{ fill: seriesItem.color, stroke: bulletBackgroundColor }" stroke-width="2" />
                 </g>
             </svg>
 
@@ -128,8 +128,8 @@ const activeIndex = ref<number | null>(null);
 const mousePixelX = ref<number>(0);
 const mousePixelY = ref<number>(0);
 
-// 用于 SVG 点中实心背景填色 (取原生二级背景变量)
-const bulletBackgroundColor = "var(--background-secondary, #ffffff)";
+// 用于 SVG 点中实心背景填色 (经内联 style 应用，跟随主题表面色)
+const bulletBackgroundColor = "var(--ll-surface, #ffffff)";
 
 // 计算最大值与 Y 轴刻度
 const maxDataValue = computed(() => {
@@ -286,13 +286,13 @@ const tooltipStyle = computed(() => {
     font-size: 0.85em;
 
     .chart-header {
-        padding: 4px 6px;
+        padding: 2px 2px var(--ll-space-2);
 
         .chart-title {
             margin: 0;
-            font-size: 1.15em;
+            font-size: 1em;
             font-weight: 700;
-            color: var(--text-normal);
+            color: var(--ll-text);
         }
     }
 
@@ -307,19 +307,19 @@ const tooltipStyle = computed(() => {
         display: block;
 
         .grid-line {
-            stroke: var(--background-modifier-border, rgba(128, 128, 128, 0.18));
+            stroke: var(--ll-border);
             stroke-width: 1;
             stroke-dasharray: 2 2;
         }
 
         .axis-text {
             font-size: 11px;
-            fill: var(--text-muted);
+            fill: var(--ll-text-3);
             font-family: inherit;
         }
 
         .crosshair-line {
-            stroke: var(--text-muted);
+            stroke: var(--ll-text-3);
             stroke-width: 1;
             opacity: 0.5;
         }
@@ -330,12 +330,12 @@ const tooltipStyle = computed(() => {
         top: 0;
         left: 0;
         z-index: 200;
-        background-color: var(--background-primary, #ffffff);
-        color: var(--text-normal);
-        border: 1px solid var(--background-modifier-border, rgba(128, 128, 128, 0.2));
-        border-radius: var(--radius-m, 6px);
-        padding: 8px 12px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        background-color: var(--ll-surface);
+        color: var(--ll-text);
+        border: 1px solid var(--ll-border);
+        border-radius: var(--ll-radius-sm);
+        padding: var(--ll-space-2) var(--ll-space-3);
+        box-shadow: var(--ll-shadow-2);
         pointer-events: none;
         min-width: 110px;
         transition: transform 0.12s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.15s ease;
@@ -345,8 +345,8 @@ const tooltipStyle = computed(() => {
             font-size: 0.9em;
             font-weight: 600;
             margin-bottom: 6px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--background-modifier-border, rgba(128, 128, 128, 0.15));
+            color: var(--ll-text-2);
+            border-bottom: 1px solid var(--ll-border);
             padding-bottom: 3px;
         }
 
@@ -371,12 +371,12 @@ const tooltipStyle = computed(() => {
             .tooltip-name {
                 flex: 1;
                 margin-right: 10px;
-                color: var(--text-muted);
+                color: var(--ll-text-2);
             }
 
             .tooltip-val {
                 font-weight: 600;
-                color: var(--text-normal);
+                color: var(--ll-text);
             }
         }
     }

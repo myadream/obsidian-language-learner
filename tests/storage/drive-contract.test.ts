@@ -18,7 +18,7 @@ function makeExpression(over: Partial<ExpressionInfo> = {}): ExpressionInfo {
     };
 }
 
-const DRIVES = ["indexed", "sqlite", "csv"] as const;
+const DRIVES = ["indexed", "sqlite", "csv", "tedb"] as const;
 
 describe.each(DRIVES)("%s drive contract", (type) => {
     let fixture: DriveFixture;
@@ -29,6 +29,7 @@ describe.each(DRIVES)("%s drive contract", (type) => {
 
     afterEach(() => {
         fixture.drive.close();
+        fixture.adapter.dispose();
     });
 
     it("posts and reads back an expression", async () => {

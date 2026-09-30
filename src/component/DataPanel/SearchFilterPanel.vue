@@ -1,67 +1,44 @@
 <template>
     <div class="search-filter-panel">
-        <!-- 搜索区域 -->
-        <NSpace vertical :size="10">
-            <!-- Expression 搜索 -->
-            <div class="filter-row">
-                <span class="filter-label">
-                    {{ t("Word") }}:
-                </span>
-                <NInput
-                    size="small"
-                    :value="modelValue.expression"
-                    @update:value="(val) => updateField('expression', val)"
-                    :placeholder="t('Search by word...')"
-                    clearable
-                />
-            </div>
+        <div class="keyword-search">
+            <NSelect
+                class="field-select"
+                :value="segment"
+                @update:value="segment = $event"
+                :options="segmentOptions"
+                size="small"
+                :consistent-menu-width="false"
+            />
 
-            <!-- Meaning 搜索 -->
-            <div class="filter-row">
-                <span class="filter-label">
-                    {{ t("Meaning") }}:
-                </span>
-                <NInput
-                    size="small"
-                    :value="modelValue.meaning"
-                    @update:value="(val) => updateField('meaning', val)"
-                    :placeholder="t('Search by meaning...')"
-                    clearable
-                />
-            </div>
+            <NInput
+                class="keyword-input"
+                size="small"
+                :value="modelValue[segment]"
+                @update:value="(val) => updateField(segment, val)"
+                :placeholder="segment === 'expression' ? t('Search by word...') : t('Search by meaning...')"
+                clearable
+            >
+                <template #prefix>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                </template>
+            </NInput>
 
-            <!-- Status 和 Type 筛选 -->
-            <div class="filter-row filter-row-multiple">
-                <span class="filter-label">
-                    {{ t("Status") }}:
-                </span>
-                <NSelect
-                    :value="modelValue.status"
-                    @update:value="(val) => updateField('status', val)"
-                    :options="statusOptions"
-                    size="small"
-                    style="width: 120px;"
-                    clearable
-                />
-
-                <span class="filter-label" style="margin-left: 20px;">
-                    {{ t("Type") }}:
-                </span>
-                <NSelect
-                    :value="modelValue.t"
-                    @update:value="(val) => updateField('t', val)"
-                    :options="typeOptions"
-                    size="small"
-                    style="width: 120px;"
-                    clearable
-                />
-            </div>
-        </NSpace>
+            <!-- 另一字段已有筛选值时的提示点 -->
+            <span
+                v-if="otherFieldValue"
+                class="other-field-dot"
+                :title="`${otherFieldLabel}: ${otherFieldValue}`"
+            ></span>
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { NInput, NSelect, NSpace } from 'naive-ui';
+import { ref, computed } from 'vue';
+import { NInput, NSelect } from 'naive-ui';
 import { t } from '@/lang/helper';
 
 const props = defineProps<{
@@ -71,8 +48,6 @@ const props = defineProps<{
         status: number | undefined;
         t: string | undefined;
     };
-    statusOptions: Array<{ label: string; value: number | undefined }>;
-    typeOptions: Array<{ label: string; value: string | undefined }>;
 }>();
 
 const emit = defineEmits<{
@@ -80,10 +55,22 @@ const emit = defineEmits<{
     (e: 'search'): void;
 }>();
 
+// 当前搜索的目标字段：单词 或 释义（下拉切换）
+const segment = ref<'expression' | 'meaning'>('expression');
+
+const segmentOptions = computed(() => [
+    { label: t('Word'), value: 'expression' },
+    { label: t('Meaning'), value: 'meaning' },
+]);
+
+const otherField = computed(() => segment.value === 'expression' ? 'meaning' : 'expression');
+const otherFieldValue = computed(() => props.modelValue[otherField.value]);
+const otherFieldLabel = computed(() => otherField.value === 'expression' ? t('Word') : t('Meaning'));
+
 // 防抖搜索
 let searchTimeout: NodeJS.Timeout | null = null;
 
-const updateField = (field: keyof typeof props.modelValue, value: any) => {
+const updateField = (field: 'expression' | 'meaning', value: string) => {
     // 检查值是否真的改变了
     if (props.modelValue[field] === value) return;
 
@@ -106,22 +93,39 @@ const updateField = (field: keyof typeof props.modelValue, value: any) => {
 
 <style lang="scss" scoped>
 .search-filter-panel {
-    .filter-row {
-        display: grid;
-        grid-template-columns: auto 2fr auto;
-        align-items: center;
-        gap: 10px;
+    flex: 1 1 240px;
+    max-width: 440px;
+    min-width: 0;
+}
 
-        &.filter-row-multiple {
-            grid-template-columns: auto auto auto auto auto auto;
-        }
+.keyword-search {
+    display: flex;
+    align-items: center;
+    gap: var(--ll-space-2);
+    min-width: 0;
 
-        .filter-label {
-            display: inline-block;
-            font-size: 1.1em;
-            font-weight: bold;
-            white-space: nowrap;
+    .field-select {
+        flex-shrink: 0;
+        width: 92px;
+    }
+
+    .keyword-input {
+        flex: 1;
+        min-width: 0;
+
+        svg {
+            width: 13px;
+            height: 13px;
+            display: block;
         }
+    }
+
+    .other-field-dot {
+        width: 6px;
+        height: 6px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: var(--ll-accent);
     }
 }
 </style>

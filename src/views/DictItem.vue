@@ -4,14 +4,13 @@
             <div :class="['dict-icon', props.id]"></div>
             <span class="dict-name">{{ props.name }}</span>
             <div class="dict-loading" style="padding-left: 20px">
-                searching...
+                {{ t("Loading...") }}
             </div>
             <div class="empty-area"></div>
-            <button>
-                <svg class="fold-arrow" width="18" height="18" viewBox="0 0 59.414 59.414"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <path class="dictItemHead-FoldArrowPath"
-                        d="M43.854 59.414L14.146 29.707 43.854 0l1.414 1.414-28.293 28.293L45.268 58"></path>
+            <button :aria-label="props.name">
+                <svg class="fold-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
                 </svg>
             </button>
         </header>
@@ -19,10 +18,10 @@
             <article>
                 <slot></slot>
             </article>
-            <button class="fold-mask" @click="onExpand">
-                <svg class="fold-mask-arrow" width="15" height="15" viewBox="0 0 59.414 59.414"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <path d="M58 14.146L29.707 42.44 1.414 14.145 0 15.56 29.707 45.27 59.414 15.56"></path>
+            <button class="fold-mask" @click="onExpand" :aria-label="t('Details')">
+                <svg class="fold-mask-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
                 </svg>
             </button>
         </div>
@@ -34,6 +33,7 @@ import { ref, watch, getCurrentInstance, toRef } from "vue";
 import { Platform } from "obsidian";
 import PluginType from "@/plugin";
 import { getRGB } from "@/utils/style";
+import { t } from "@/lang/helper";
 
 const plugin = getCurrentInstance().appContext.config.globalProperties
     .plugin as PluginType;
@@ -110,22 +110,47 @@ watch(
 .dict-item {
     header.dict-item-header {
         display: flex;
+        align-items: center;
         position: sticky;
         top: 0;
         z-index: 100;
-        border-top: 2px dashed gray;
+        border-top: 1px solid var(--ll-border);
         background-color: v-bind(bgRGBA3);
-        height: 22px;
+        height: 32px;
+        cursor: pointer;
+        padding: 0 var(--ll-space-2);
+        transition: background-color var(--ll-speed) var(--ll-ease);
+
+        &:hover {
+            background-color: var(--ll-hover);
+
+            // hover 时不透明背景失效，回退为纯色底
+            &:not(:hover) {
+                background-color: v-bind(bgRGBA3);
+            }
+        }
 
         .dict-icon {
-            height: 20px;
-            width: 20px;
+            height: 18px;
+            width: 18px;
             background-size: cover;
+            flex-shrink: 0;
         }
 
         .dict-name {
-            padding-left: 3px;
+            padding-left: var(--ll-space-2);
             line-height: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--ll-text-2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dict-loading {
+            font-size: 12px;
+            color: var(--ll-text-3);
         }
 
         .empty-area {
@@ -133,23 +158,31 @@ watch(
         }
 
         button {
-            color: rgb(236, 239, 244);
-            width: 19px;
-            height: 19px;
+            color: var(--ll-text-2);
+            width: 22px;
+            height: 22px;
             background: 0 0;
             border: none;
             padding: 0;
             cursor: pointer;
             box-shadow: none;
+            border-radius: var(--ll-radius-xs);
 
             &:hover {
                 box-shadow: none;
+                color: var(--ll-primary);
+            }
+
+            &:focus-visible {
+                outline: 2px solid var(--ll-primary);
+                outline-offset: -2px;
             }
 
             .fold-arrow {
-                transition: transform 0.4s;
-                padding: 3px;
-                fill: gray;
+                width: 15px;
+                height: 15px;
+                display: block;
+                transition: transform 0.3s var(--ll-ease);
             }
         }
     }
@@ -157,10 +190,10 @@ watch(
     .dict-item-body {
         position: relative;
         overflow: hidden;
-        padding-top: 10px;
+        padding-top: var(--ll-space-2);
         transition: max-height 1s cubic-bezier(0, 1, 0, 1);
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: var(--ll-space-3);
+        padding-right: var(--ll-space-3);
 
         .fold-mask {
             position: absolute;
@@ -180,8 +213,12 @@ watch(
             .fold-mask-arrow {
                 position: absolute;
                 z-index: 10;
-                bottom: 0;
-                fill: gray;
+                bottom: 6px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 16px;
+                height: 16px;
+                color: var(--ll-text-2);
                 margin: 0 auto;
             }
         }
@@ -209,9 +246,8 @@ watch(
     }
 
     &.open {
-        .fold-arrow {
-            transform: rotate(-90deg);
-            transition: transform 0.4s;
+        header button .fold-arrow {
+            transform: rotate(180deg);
         }
     }
 

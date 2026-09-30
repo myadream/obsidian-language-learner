@@ -1,57 +1,79 @@
 <template>
     <div class="action-buttons">
-        <NSpace justify="end" :size="10">
-            <NButton
-                @click="$emit('addWord')"
-                size="small"
-                strong
-                secondary
-                type="info"
-            >
-                {{ t("Learning New Words") }}
-            </NButton>
+        <NButton
+            size="small"
+            quaternary
+            :title="t('Refresh Word Database')"
+            :aria-label="t('Refresh Word Database')"
+            @click="$emit('refresh')"
+        >
+            <template #icon>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+            </template>
+        </NButton>
 
+        <NDropdown :options="exportOptions" @select="handleExport">
             <NButton
-                @click="$emit('refresh')"
                 size="small"
-                strong
-                secondary
-                type="info"
+                quaternary
+                :title="t('Export')"
+                :aria-label="t('Export')"
             >
-                {{ t("Refresh Word Database") }}
+                <template #icon>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                </template>
             </NButton>
+        </NDropdown>
 
-            <NDropdown :options="exportOptions" @select="handleExport">
-                <NButton
-                    size="small"
-                    strong
-                    secondary
-                    type="success"
-                >
-                    {{ t("Export") }}
-                </NButton>
-            </NDropdown>
+        <NButton
+            v-if="hasActiveFilters"
+            size="small"
+            quaternary
+            type="warning"
+            :title="t('Reset Filters')"
+            :aria-label="t('Reset Filters')"
+            @click="$emit('resetFilters')"
+        >
+            <template #icon>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </template>
+        </NButton>
 
-            <NButton
-                @click="$emit('resetFilters')"
-                size="small"
-                strong
-                secondary
-                type="warning"
-                v-if="hasActiveFilters"
-            >
-                {{ t("Reset Filters") }}
-            </NButton>
-        </NSpace>
+        <div class="cmd-divider" aria-hidden="true"></div>
+
+        <NButton
+            type="primary"
+            size="small"
+            @click="$emit('addWord')"
+        >
+            <template #icon>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+            </template>
+            {{ t("Learning New Words") }}
+        </NButton>
     </div>
 </template>
 
 <script setup lang="ts">
-import { NSpace, NButton, NDropdown } from 'naive-ui';
+import { NButton, NDropdown } from 'naive-ui';
 import { t } from '@/lang/helper';
 import type { DropdownMixedOption } from 'naive-ui';
 
-const props = defineProps<{
+defineProps<{
     hasActiveFilters: boolean;
 }>();
 
@@ -80,6 +102,23 @@ const handleExport = (format: string) => {
 
 <style lang="scss" scoped>
 .action-buttons {
-    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    flex-shrink: 0;
+
+    .cmd-divider {
+        width: 1px;
+        height: 16px;
+        background: var(--ll-border);
+        margin: 0 var(--ll-space-2);
+    }
+
+    svg {
+        width: 15px;
+        height: 15px;
+        display: block;
+    }
 }
 </style>

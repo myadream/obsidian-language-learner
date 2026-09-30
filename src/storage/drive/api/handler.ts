@@ -265,10 +265,12 @@ export class ApiStorageDrive extends StorageDrive {
         }
     }
 
-    async importDB(_data: any, _format: 'json' | 'csv' | 'sqlite3') {
+    // API 驱动已停用；仅保留实现以满足抽象契约
+    async exportData(): Promise<ExpressionInfo[]> {
+        return [];
     }
 
-    async exportDB() {
+    async importData(_items: ExpressionInfo[]): Promise<void> {
     }
 
     async destroyAll() {

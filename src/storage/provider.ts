@@ -4,6 +4,8 @@ import StorageDrive from "./drive";
 import { IndexedStorageDrive } from './drive/Indexed/handler';
 import {Sqlite3StorageDrive} from "@/storage/drive/sqlite3/handle";
 import {CsvStorageDrive} from "@/storage/drive/csv/handle";
+import {TedbStorageDrive} from "@/storage/drive/tedb/handle";
+import {Platform} from "obsidian";
 
 export class StorageProvider {
 
@@ -24,7 +26,7 @@ export class StorageProvider {
     }
 
     public async drive(drive: string): Promise<StorageDrive> {
-        this.destroyed();
+        await this.destroyed();
 
         this.useConnect = this.register(drive);
 
@@ -33,10 +35,10 @@ export class StorageProvider {
         return this.useConnect;
     }
 
-    // 销毁所有服务
-    public destroyed() {
+    // 销毁所有服务；等待驱动把未落盘的延迟写入刷完，避免重开/卸载丢数据
+    public async destroyed(): Promise<void> {
         if (this.useConnect) {
-            this.useConnect.close();
+            await this.useConnect.close();
             this.useConnect = null;
         }
     }
@@ -64,6 +66,16 @@ export class StorageProvider {
                 return new Sqlite3StorageDrive(this.plugin);
             case StorageProviderDriveType.CSV:
                 return new CsvStorageDrive(this.plugin);
+            case StorageProviderDriveType.TEDB:
+                // tedb 依赖 Node fs（window.require），仅桌面端可用；
+                // 移动端选择该类型时回退 IndexedDB，open() 内还有二次兜底
+                if (!Platform.isDesktopApp) {
+                    console.warn(
+                        "[StorageProvider] tedb storage is desktop-only, falling back to indexed"
+                    );
+                    break;
+                }
+                return new TedbStorageDrive(this.plugin);
             case StorageProviderDriveType.INDEXED:
             default:
                 if (drive !== StorageProviderDriveType.INDEXED) {
@@ -81,4 +93,5 @@ export enum StorageProviderDriveType {
     INDEXED = 'indexed',
     SQLITE = 'sqlite',
     CSV = 'csv',
+    TEDB = 'tedb',
 }

@@ -1,18 +1,57 @@
 <template>
     <div id="langr-search" @click="handleClick">
         <NConfigProvider :theme="theme" :theme-overrides="themeConfig">
-            <div class="search-bar" style="display:flex;">
-                <NButtonGroup size="tiny">
-                    <NButton :disabled="historyIndex <= 0" @click="switchHistory('prev')">{{ `<` }} </NButton>
-                            <NButton :disabled="historyIndex >= lastHistory" @click="switchHistory('next')">{{ ">" }}
-                            </NButton>
-                </NButtonGroup>
-                <NInput size="tiny" type="text" placeholder="输入单词" v-model:value="inputWord" style="flex:1;"
-                    @keydown.enter="handleSearch" />
-                <NButton size="tiny" @click="handleSearch" style="margin-left:5px;">{{ t("Search") }}</NButton>
-            </div>
+            <!-- 查询区：词头 + 搜索行 -->
+            <header class="query-zone">
+                <div class="word-headline">
+                    <span class="headline-text" :class="{ placeholder: !word }">{{ word || t("Word") }}</span>
+                    <div class="history-nav">
+                        <NButton size="tiny" quaternary :disabled="historyIndex <= 0" @click="switchHistory('prev')" :title="t('Search') + ' <'">
+                            <template #icon>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 18 9 12 15 6" />
+                                </svg>
+                            </template>
+                        </NButton>
+                        <NButton size="tiny" quaternary :disabled="historyIndex >= lastHistory" @click="switchHistory('next')" :title="t('Search') + ' >'">
+                            <template #icon>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </template>
+                        </NButton>
+                    </div>
+                </div>
+
+                <div class="query-row">
+                    <NInput
+                        class="search-input"
+                        size="small"
+                        type="text"
+                        :placeholder="t('Search by word...')"
+                        v-model:value="inputWord"
+                        @keydown.enter="handleSearch"
+                        clearable
+                    >
+                        <template #prefix>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                        </template>
+                    </NInput>
+                    <NButton size="small" type="primary" :title="t('Search')" :aria-label="t('Search')" @click="handleSearch">
+                        <template #icon>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                        </template>
+                    </NButton>
+                </div>
+            </header>
         </NConfigProvider>
-        <div class="dict-area" style="overflow:auto;">
+        <div class="dict-area">
             <DictItem v-for="(cp, i) in components" :loading="loadings[i]" :name="cp.name" :id="cp.id" :key="i">
                 <KeepAlive>
                     <Component @loading="loading" :is="cp.type" :word="word" v-show="shows[i]"></Component>
@@ -24,19 +63,18 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, getCurrentInstance, markRaw } from "vue";
-import { NConfigProvider, NButton, NButtonGroup, NInput, darkTheme, GlobalThemeOverrides } from "naive-ui";
+import { NConfigProvider, NButton, NInput, darkTheme, GlobalThemeOverrides } from "naive-ui";
 
 import DictItem from "./DictItem.vue";
 import { t } from "@/lang/helper";
 import PluginType from "@/plugin";
 import { dicts } from "@dict/list";
 import { playAudio } from "@/utils/helpers";
+import { getThemeOverrides } from "@/styles/theme";
 
 const plugin = getCurrentInstance().appContext.config.globalProperties.plugin as PluginType;
 
-const themeConfig: GlobalThemeOverrides = {
-
-};
+const themeConfig: GlobalThemeOverrides = getThemeOverrides(plugin.store.dark);
 
 let components = ref([]);
 let map: { [K in string]: number } = {};
@@ -150,21 +188,89 @@ onUnmounted(() => {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    font-size: 0.8em;
+    font-size: 0.9em;
     user-select: text;
     display: flex;
     flex-direction: column;
 
-    .search-bar {
-        margin-bottom: 5px;
+    // ── 查询区：词头行 + 搜索行 ─────────────────────────────
+    .query-zone {
+        flex-shrink: 0;
+        padding: var(--ll-space-2) var(--ll-space-3);
+        background: var(--ll-surface-2);
+        border-bottom: 1px solid var(--ll-border);
+        display: flex;
+        flex-direction: column;
+        gap: var(--ll-space-1);
+    }
 
-        button {
-            margin-right: 5px;
+    .word-headline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--ll-space-2);
+        min-height: 24px;
+
+        .headline-text {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--ll-text);
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+
+            &.placeholder {
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--ll-text-3);
+            }
+        }
+
+        .history-nav {
+            display: flex;
+            flex-shrink: 0;
+            gap: 2px;
+
+            svg {
+                width: 13px;
+                height: 13px;
+                display: block;
+            }
+        }
+    }
+
+    .query-row {
+        display: flex;
+        align-items: center;
+        gap: var(--ll-space-2);
+
+        .search-input {
+            flex: 1;
+            min-width: 0;
+
+            svg {
+                width: 13px;
+                height: 13px;
+                display: block;
+            }
+        }
+
+        > .n-button {
+            flex-shrink: 0;
+
+            svg {
+                width: 14px;
+                height: 14px;
+                display: block;
+            }
         }
     }
 
     .dict-area {
         flex: 1;
+        overflow: auto;
     }
 }
 

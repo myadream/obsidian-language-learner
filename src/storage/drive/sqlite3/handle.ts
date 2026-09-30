@@ -18,7 +18,7 @@ import {
 } from "@/storage/interface";
 
 import Plugin from "@/plugin";
-import initSqlJs, { Database, SqlJsStatic, SqlJsConfig } from "sql.js";
+import { Database, SqlJsStatic } from "sql.js";
 import {  moment, normalizePath, Platform } from "obsidian";
 import {
     ConnectionsTable,
@@ -31,14 +31,16 @@ import {
 import {
     connectionsTableTransform,
     expressionsTableTransform,
+    extractAllDataFromDatabase,
+    loadSqlJs,
     mapSqlResultToTypedArray,
     mapSqlResultToTypedObject,
     notesTableTransform,
     sentencesTableTransform,
     tagsTableTransform,
 } from "@/storage/drive/sqlite3/uitils";
+import { toUnixSeconds } from "@/storage/utils";
 import { createAutomaton } from "ac-auto";
-import download from "downloadjs";
 
 export class Sqlite3StorageDrive extends StorageDrive {
     plugin: Plugin;
@@ -97,48 +99,8 @@ export class Sqlite3StorageDrive extends StorageDrive {
             this.storagePath
         );
 
-        const wasmName = "sql-wasm.wasm";
-        const pluginDir = normalizePath(".obsidian/plugins/" + this.plugin.manifest.id);
-
-        let wasmPath = normalizePath(pluginDir + "/" + wasmName);
-
-        // Check if wasm exists in plugin root, otherwise check node_modules (dev)
-        if (!(await adapter.exists(wasmPath))) {
-            wasmPath = normalizePath("/node_modules/sql.j/dist/" + wasmName);
-        }
-
-        console.log(
-            `[${isMobile ? "Mobile" : "Desktop"}] WASM 路径：`,
-            wasmPath
-        );
-
-        const config: SqlJsConfig = {};
-        if (await adapter.exists(wasmPath)) {
-            try {
-                // 尝试使用 readBinary 方法
-                if (typeof (adapter as any).readBinary === "function") {
-                    config.wasmBinary = await (adapter as any).readBinary(
-                        wasmPath
-                    );
-                    console.log(
-                        `[${isMobile ? "Mobile" : "Desktop"}] WASM 文件加载成功`
-                    );
-                } else {
-                    console.warn(
-                        "adapter.readBinary 方法不可用，将从 CDN 加载 WASM 文件"
-                    );
-                }
-            } catch (err) {
-                console.error("Failed to read WASM file:", err);
-                console.warn("将继续使用默认 WASM 加载方式（CDN）");
-            }
-        } else {
-            console.warn("sql-wasm.wasm not found at", wasmPath);
-            console.warn("将从 CDN 加载 WASM 文件");
-        }
-
         try {
-            this.sqlJs = await initSqlJs(config);
+            this.sqlJs = await loadSqlJs(this.plugin);
             console.log(
                 `[${isMobile ? "Mobile" : "Desktop"}] SQL.js 初始化成功`
             );
@@ -314,8 +276,9 @@ export class Sqlite3StorageDrive extends StorageDrive {
         await this.init();
     }
 
-    close(): void {
-        this.flushPersist();
+    async close(): Promise<void> {
+        // 先等延迟写入落盘，再关内存数据库，避免 close 后重开读到旧文件
+        await this.flushPersist();
         this.storageDrive?.close();
         this.sqlJs = null;
     }
@@ -333,17 +296,17 @@ export class Sqlite3StorageDrive extends StorageDrive {
         }, delayMs);
     }
 
-    /** 立即落盘（仅当存在未刷新的延迟写入） */
-    private flushPersist(): void {
+    /** 立即落盘（仅当存在未刷新的延迟写入），返回写完的 Promise 供 close 等待 */
+    private flushPersist(): Promise<void> {
         if (this.persistTimer !== null) {
             clearTimeout(this.persistTimer);
             this.persistTimer = null;
         }
         if (!this.pendingPersist) {
-            return;
+            return Promise.resolve();
         }
         this.pendingPersist = false;
-        this.exportDbToFile();
+        return this.exportDbToFile();
     }
 
     async exportDbToFile() {
@@ -501,16 +464,6 @@ export class Sqlite3StorageDrive extends StorageDrive {
         // 重建空表并落盘，保证销毁后驱动仍可直接使用
         this.createDbTables();
         return Promise.resolve();
-    }
-
-    async exportDB() {
-        const blob = this.storageDrive.export();
-
-        try {
-            download(blob, `${this.storageName}.sqlite`, "application/sqlite");
-        } catch (error) {
-            console.error("数据库持久化导出失败：", error);
-        }
     }
 
     async getAllExpressionSimple(
@@ -1054,371 +1007,15 @@ export class Sqlite3StorageDrive extends StorageDrive {
         return [];
     }
 
-    async importDB(file: File, format: 'json' | 'csv' | 'sqlite3'): Promise<void> {
-        try {
-            if (format === 'sqlite3') {
-                await this.importFromSQLite3File(file);
-            } else if (format === 'json') {
-                await this.importFromJSON(file);
-            } else if (format === 'csv') {
-                await this.importFromCSV(file);
-            }
-        } catch (error) {
-            console.error('Import failed:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Import from SQLite3 database file
-     * Reads the external SQLite3 database and copies all data to current database
-     */
-    private async importFromSQLite3File(file: File): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-
-            reader.onload = async () => {
-                try {
-                    const arrayBuffer = reader.result as ArrayBuffer;
-                    const uint8Array = new Uint8Array(arrayBuffer);
-
-                    // Create a temporary database from the imported file
-                    const tempDB = new this.sqlJs.Database(uint8Array);
-
-                    // Get all data from temp database
-                    const importedData = await this.extractAllDataFromDB(tempDB);
-
-                    // Close temp database
-                    tempDB.close();
-
-                    // Insert all data into current database
-                    await this.bulkInsertData(importedData);
-
-                    // Export to file
-                    this.exportDbToFile();
-
-                    resolve();
-                } catch (error) {
-                    console.error('Failed to import SQLite3 file:', error);
-                    reject(error);
-                }
-            };
-
-            reader.onerror = () => {
-                reject(new Error('Failed to read file'));
-            };
-
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    /**
-     * Import from JSON file
-     * Expected JSON format: Array of ExpressionInfo objects
-     */
-    private async importFromJSON(file: File): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-
-            reader.onload = async () => {
-                try {
-                    const jsonContent = reader.result as string;
-                    const data = JSON.parse(jsonContent);
-
-                    // Validate and transform data
-                    const expressions = this.validateAndTransformJSONData(data);
-
-                    // Insert all data
-                    await this.bulkInsertExpressions(expressions);
-
-                    // Export to file
-                    this.exportDbToFile();
-
-                    resolve();
-                } catch (error) {
-                    console.error('Failed to import JSON file:', error);
-                    reject(error);
-                }
-            };
-
-            reader.onerror = () => {
-                reject(new Error('Failed to read file'));
-            };
-
-            reader.readAsText(file);
-        });
-    }
-
-    /**
-     * Import from CSV file
-     * Expected CSV format: Expression,Meaning,Status,Type,Tags,Date
-     */
-    private async importFromCSV(file: File): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-
-            reader.onload = async () => {
-                try {
-                    const csvContent = reader.result as string;
-                    const expressions = this.parseCSVData(csvContent);
-
-                    // Insert all data
-                    await this.bulkInsertExpressions(expressions);
-
-                    // Export to file
-                    this.exportDbToFile();
-
-                    resolve();
-                } catch (error) {
-                    console.error('Failed to import CSV file:', error);
-                    reject(error);
-                }
-            };
-
-            reader.onerror = () => {
-                reject(new Error('Failed to read file'));
-            };
-
-            reader.readAsText(file);
-        });
-    }
-
-    /**
-     * Extract all data from a database instance
-     */
-    private async extractAllDataFromDB(db: Database): Promise<ExpressionInfo[]> {
-        const expressions: ExpressionInfo[] = [];
-
-        // Get all expressions
-        const exprsResult = db.exec("SELECT * FROM expressions");
-        if (exprsResult.length > 0) {
-            const exprs = mapSqlResultToTypedArray<ExpressionsTable>(
-                exprsResult[0],
-                expressionsTableTransform
-            );
-
-            for (const expr of exprs) {
-                const expressionInfo: ExpressionInfo = {
-                    expression: expr.expression,
-                    meaning: expr.meaning,
-                    status: expr.status,
-                    t: expr.t,
-                    tags: [],
-                    notes: [],
-                    sentences: [],
-                    connections: [],
-                    date: expr.date,
-                };
-
-                // Get tags for this expression
-                const tagsResult = db.exec(
-                    "SELECT tag FROM tags WHERE expression = ?",
-                    [expr.expression]
-                );
-                if (tagsResult.length > 0) {
-                    expressionInfo.tags = tagsResult[0].values.map((row: any[]) => row[0]);
-                }
-
-                // Get notes for this expression
-                const notesResult = db.exec(
-                    "SELECT note FROM notes WHERE expression = ?",
-                    [expr.expression]
-                );
-                if (notesResult.length > 0) {
-                    expressionInfo.notes = notesResult[0].values.map((row: any[]) => row[0]);
-                }
-
-                // Get sentences for this expression
-                const sentencesResult = db.exec(
-                    "SELECT sentence, trans, origin FROM sentences WHERE expression = ?",
-                    [expr.expression]
-                );
-                if (sentencesResult.length > 0) {
-                    expressionInfo.sentences = sentencesResult[0].values.map((row: any[]) => ({
-                        sentence: row[0],
-                        trans: row[1] || '',
-                        origin: row[2] || '',
-                        expression: expr.expression,
-                    }));
-                }
-
-                // Get connections for this expression
-                const connsResult = db.exec(
-                    "SELECT connection FROM connections WHERE expression = ?",
-                    [expr.expression]
-                );
-                if (connsResult.length > 0) {
-                    expressionInfo.connections = connsResult[0].values.map((row: any[]) => row[0]);
-                }
-
-                expressions.push(expressionInfo);
-            }
-        }
-
-        return expressions;
-    }
-
-    /**
-     * Validate and transform JSON data
-     */
-    private validateAndTransformJSONData(data: any): ExpressionInfo[] {
-        const expressions: ExpressionInfo[] = [];
-
-        // Handle array format
-        if (Array.isArray(data)) {
-            for (const item of data) {
-                const expr = this.validateExpressionInfo(item);
-                if (expr) {
-                    expressions.push(expr);
-                }
-            }
-        }
-        // Handle object with data property
-        else if (data.data && Array.isArray(data.data)) {
-            for (const item of data.data) {
-                const expr = this.validateExpressionInfo(item);
-                if (expr) {
-                    expressions.push(expr);
-                }
-            }
-        }
-
-        return expressions;
-    }
-
-    /**
-     * Validate a single ExpressionInfo object
-     */
-    private validateExpressionInfo(item: any): ExpressionInfo | null {
-        if (!item || typeof item !== 'object') {
-            return null;
-        }
-
-        // Required fields
-        const expression = item.expression || item.Expression;
-        if (!expression || typeof expression !== 'string') {
-            console.warn('Invalid expression item: missing or invalid expression field', item);
-            return null;
-        }
-
-        return {
-            expression: expression.trim(),
-            meaning: (item.meaning || item.Meaning || '')?.toString().trim() || '',
-            status: parseInt(item.status || item.Status || '0'),
-            t: (item.t || item.Type || 'WORD')?.toString().toUpperCase() || 'WORD',
-            tags: Array.isArray(item.tags) ? item.tags : [],
-            notes: Array.isArray(item.notes) ? item.notes : [],
-            sentences: Array.isArray(item.sentences) ? item.sentences : [],
-            connections: Array.isArray(item.connections) ? item.connections : [],
-            date: item.date || moment().format("YYYY-MM-DD HH:mm:ss"),
-        };
-    }
-
-    /**
-     * Parse CSV data
-     * Expected format: Expression,Meaning,Status,Type,Tags,Date
-     */
-    private parseCSVData(csvContent: string): ExpressionInfo[] {
-        const expressions: ExpressionInfo[] = [];
-        const lines = csvContent.split('\n');
-
-        // Skip header if present
-        let startIndex = 0;
-        if (lines.length > 0 && lines[0].toLowerCase().includes('expression')) {
-            startIndex = 1;
-        }
-
-        for (let i = startIndex; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-
-            try {
-                // Parse CSV line (handle quoted strings)
-                const values = this.parseCSVLine(line);
-
-                if (values.length >= 1 && values[0]) {
-                    const expr: ExpressionInfo = {
-                        expression: values[0]?.trim() || '',
-                        meaning: values[1]?.trim() || '',
-                        status: parseInt(values[2]) || 0,
-                        t: values[3]?.trim().toUpperCase() || 'WORD',
-                        tags: values[4] ? values[4].split(',').map(t => t.trim()).filter(t => t) : [],
-                        notes: [],
-                        sentences: [],
-                        connections: [],
-                        date: values[5] ? moment(values[5]).format("YYYY-MM-DD HH:mm:ss") : moment().format("YYYY-MM-DD HH:mm:ss"),
-                    };
-
-                    if (expr.expression) {
-                        expressions.push(expr);
-                    }
-                }
-            } catch (error) {
-                console.warn(`Failed to parse CSV line ${i + 1}:`, line, error);
-            }
-        }
-
-        return expressions;
-    }
-
-    /**
-     * Parse a single CSV line, handling quoted strings
-     */
-    private parseCSVLine(line: string): string[] {
-        const values: string[] = [];
-        let current = '';
-        let inQuotes = false;
-
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-
-            if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                    // Escaped quote
-                    current += '"';
-                    i++;
-                } else {
-                    // Toggle quote mode
-                    inQuotes = !inQuotes;
-                }
-            } else if (char === ',' && !inQuotes) {
-                // Field separator
-                values.push(current);
-                current = '';
-            } else {
-                current += char;
-            }
-        }
-
-        // Add last field
-        values.push(current);
-
-        return values;
-    }
-
-    /**
-     * Bulk insert expressions into database
-     */
-    private async bulkInsertData(expressions: ExpressionInfo[]): Promise<void> {
-        const BATCH_SIZE = 100;
-
-        for (let i = 0; i < expressions.length; i += BATCH_SIZE) {
-            const batch = expressions.slice(i, i + BATCH_SIZE);
-            await this.bulkInsertExpressions(batch);
-        }
-    }
-
-    /**
-     * Bulk insert expressions using transactions
-     */
-    private async bulkInsertExpressions(expressions: ExpressionInfo[]): Promise<void> {
+    async importData(items: ExpressionInfo[]): Promise<void> {
         try {
             // Begin transaction
             this.storageDrive.run('BEGIN TRANSACTION');
 
-            for (const expr of expressions) {
-                await this.postExpression(expr);
+            for (const item of items) {
+                if (!item?.expression) continue;
+                // 保留数据自带的原始时间（外层 transfer 已归一化为 UNIX 秒）
+                await this.postExpression(item, toUnixSeconds(item.date));
             }
 
             // Commit transaction
@@ -1428,11 +1025,20 @@ export class Sqlite3StorageDrive extends StorageDrive {
             this.storageDrive.run('ROLLBACK');
             throw error;
         }
+
+        this.schedulePersist();
     }
 
-    postExpression(payload: ExpressionInfo): Promise<number> {
+    /** 全量导出为统一数据结构（词条 + 关联的标签/笔记/例句/关联词） */
+    async exportData(): Promise<ExpressionInfo[]> {
+        if (!this.storageDrive) {
+            return [];
+        }
+        return extractAllDataFromDatabase(this.storageDrive);
+    }
+
+    postExpression(payload: ExpressionInfo, date = moment().unix()): Promise<number> {
         // 与 IndexedDB 驱动保持一致，date 统一存 UNIX 秒
-        const date = moment().unix();
 
         // 记录本单词最终保留的句子 id，用于清理不再引用的旧句子
         const keptSentenceIds = new Set<number>();

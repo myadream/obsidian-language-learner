@@ -2,10 +2,10 @@
 	<div id="langr-learn-panel-container">
 		<LearnPanelForm :model="model">
 			<template #action>
-				<div style="margin-top: 10px">
+				<div class="panel-submit">
 					<NButton size="small" style="--n-width: 100%" attr-type="submit" @click="submit"
 						:loading="submitLoading">
-						<NIconWrapper v-if="successing" :size="18" :border-radius="6" style="margin-right: 6px;">
+						<NIconWrapper v-if="successing" :size="18" :border-radius="3" style="margin-right: 6px;">
 							<NIcon :size="16">
 								<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16 16">
 									<g fill="none">
@@ -15,7 +15,7 @@
 								</svg>
 							</NIcon>
 						</NIconWrapper>
-						<NIconWrapper v-if="failing" :size="18" :border-radius="6" style="margin-right: 6px;" color="#DE5959">
+						<NIconWrapper v-if="failing" :size="18" :border-radius="3" style="margin-right: 6px;" color="#DE5959">
 							<NIcon :size="16">
 								<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16 16">
 									<g fill="none">
@@ -25,7 +25,7 @@
 								</svg>
 							</NIcon>
 						</NIconWrapper>
-						
+
 						{{ t("Submit") }}
 					</NButton>
 				</div>
@@ -86,7 +86,11 @@ function sleep(ms: number) {
 
 <style lang="scss">
 #langr-learn-panel-container {
-    /* Styles are now in LearnPanelForm, but we can keep container styles here if needed */
+    height: 100%;
+    overflow-y: auto;
+
+    .panel-submit {
+        margin-top: var(--ll-space-3);
+    }
 }
 </style>
-

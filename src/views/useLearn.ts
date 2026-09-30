@@ -4,6 +4,8 @@ import { t } from "@/lang/helper";
 import { ExpressionInfo, Sentence } from "@/storage/interface";
 import { SelectOption, GlobalThemeOverrides } from "naive-ui";
 import Plugin from "@/plugin";
+import { getThemeOverrides } from "@/styles/theme";
+import store from "@/store";
 import { LearnPanelView } from "./LearnPanelView";
 import { ReadingView } from "./ReadingView";
 import { search } from "@dict/youdao/engine";
@@ -57,26 +59,20 @@ export function useLearn() {
     };
 
     const statusOptions = [
-        { text: t("Ignore"), style: "" },
-        { text: t("Learning"), style: "background-Color: #ff980055" },
-        { text: t("Familiar"), style: "background-Color: #ffeb3c55" },
-        { text: t("Known"), style: "background-Color: #9eda5855" },
-        { text: t("Learned"), style: "background-Color: #4cb05155" },
+        t("Ignore"),
+        t("Learning"),
+        t("Familiar"),
+        t("Known"),
+        t("Learned"),
     ];
 
     const themeOverrides: GlobalThemeOverrides = {
-        common: {},
+        ...getThemeOverrides(!!store.dark),
         Form: {
             labelFontSizeTopMedium: "15px",
             feedbackFontSizeMedium: "13px",
             blankHeightMedium: "5px",
             feedbackHeightMedium: "22px",
-        },
-        Radio: {
-            buttonBorderRadius: "5px",
-            fontSizeMedium: "13px",
-            fontSizeSmall: "13px",
-            buttonHeightSmall: "22px",
         },
         Input: {
             fontSizeSmall: "12px",

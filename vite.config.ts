@@ -43,6 +43,34 @@ function resolveVueImports() {
     };
 }
 
+// tedb-electron-storage 是桌面端专用驱动，依赖真实 Node fs/path/os。
+// 构建在浏览器/Obsidian 环境时不能走 removeNodeJsModules 的空 stub，
+// 否则 fs 调用全部变成空操作；改写为运行时经 window.require 取真实模块
+// （仅桌面端动态加载该驱动，移动端永不执行这些代码）。
+const isTedbModule = (id: string) =>
+    id.includes('tedb-electron-storage') || id.includes('graceful-fs');
+
+function tedbRealNodeModules() {
+    return {
+        name: 'tedb-real-node-modules',
+        // 必须先于 removeNodeJsModules 执行，把 require 换成运行时解析，
+        // 避免其 transform 把 require("fs") 直接替换成空 stub
+        transform(code: string, id: string) {
+            if (!isTedbModule(id.replace(/\\/g, '/'))) {
+                return null;
+            }
+            const modifiedCode = code.replace(
+                /require\((["'])(fs|path|os)\1\)/g,
+                (_m, _q, mod: string) => `globalThis.__tedbRequire("${mod}")`
+            );
+            if (modifiedCode !== code) {
+                return { code: modifiedCode, map: null };
+            }
+            return null;
+        },
+    };
+}
+
 // 自定义插件来移除 fs 和 path 等 Node.js 内置模块的引用
 function removeNodeJsModules() {
     const emptyModuleCode = `
@@ -121,6 +149,7 @@ export default defineConfig(({ mode }) => {
             extensions: ['.ts', '.tsx', '.js', '.jsx', '.vue', '.json']
         },
         plugins: [
+            tedbRealNodeModules(),  // 必须在 removeNodeJsModules 之前
             removeNodeJsModules(),  // 必须在最前面，先处理 Node.js 模块
             vue(),
             resolveVueImports(),
@@ -197,6 +226,10 @@ export default defineConfig(({ mode }) => {
                 output: {
                     exports: 'auto',
                     banner,
+                    // Obsidian 只加载 main.js 单文件：动态 import（tedb 驱动）必须内联，
+                    // 否则会被拆成额外的 dist-*.cjs chunk 而在运行时找不到。
+                    // 内联后仍是惰性求值，移动端永远不会执行 tedb 的 Node 代码。
+                    inlineDynamicImports: true,
                     globals: {
                         'obsidian': 'obsidian'
                     },

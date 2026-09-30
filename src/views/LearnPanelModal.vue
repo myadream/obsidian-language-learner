@@ -7,33 +7,36 @@
           @update:show="handleShowChange"
           :mask-closable="false"
           preset="dialog"
-          :title="t('Learning New Words')"
+          :title="isEdit ? t('Edit Word') : t('Learning New Words')"
           class="learn-panel-modal"
-          :style="{ width: '700px', maxWidth: '95vw' }"
+          :style="{ width: 'min(640px, 94vw)' }"
+          closable
         >
           <div id="langr-learn-panel-modal">
-            <LearnPanelForm :model="model">
-              <template #action>
-                <div class="form-actions">
-                  <NSpace vertical :size="12">
-                    <NButton
-                      type="primary"
-                      size="medium"
-                      attr-type="submit"
-                      @click="submit"
-                      :loading="submitLoading"
-                      class="submit-button"
-                    >
-                      <template #icon>
-                        <span style="font-size: 1.1em">✓</span>
-                      </template>
-                      {{ t("Submit") }}
-                    </NButton>
-                  </NSpace>
-                </div>
-              </template>
-            </LearnPanelForm>
+            <LearnPanelForm :model="model" />
           </div>
+          <!-- 操作固定在底栏，长表单滚动时提交/取消始终可见 -->
+          <template #action>
+            <div class="modal-actions">
+              <NButton quaternary @click="handleCancel">
+                {{ t("Cancel") }}
+              </NButton>
+              <NButton
+                type="primary"
+                size="medium"
+                @click="submit"
+                :loading="submitLoading"
+                class="submit-button"
+              >
+                <template #icon>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 15px; height: 15px; display: block;">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </template>
+                {{ t("Submit") }}
+              </NButton>
+            </div>
+          </template>
         </NModal>
       </NMessageProvider>
     </NConfigProvider>
@@ -41,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, NButton, NConfigProvider, NModal, NSpace, NMessageProvider } from "naive-ui";
+import { darkTheme, NButton, NConfigProvider, NModal, NMessageProvider } from "naive-ui";
 import { ExpressionInfo } from "@/storage/interface";
 import { computed, PropType, watch, getCurrentInstance, ref } from "vue";
 import { t } from "@/lang/helper";
@@ -66,9 +69,17 @@ const props = defineProps({
 
 const { model, themeOverrides, plugin, submit: submitForm } = useLearn();
 
+// 编辑已有单词时切换标题
+const isEdit = computed(() => Boolean(props.word?.expression));
+
 // 处理模态框显示状态变化
 const handleShowChange = (value: boolean) => {
     emit("onChangeShow", value);
+};
+
+// 取消编辑，直接关闭
+const handleCancel = () => {
+    emit("onChangeShow", false);
 };
 
 watch(
@@ -108,66 +119,81 @@ async function submit() {
 </script>
 
 <style lang="scss">
+// NModal 的 class 落在 dialog 根元素自身而非父容器，必须 &.n-dialog 才能命中
 .learn-panel-modal {
-  max-height: 85vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  &.n-dialog {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--ll-radius-md);
+    border-top: 2px solid var(--ll-primary);
+    padding: 0;
 
-  // 模态框标题样式
-  .n-dialog__title {
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  // 内容区域
-  .n-dialog__content {
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px 0;
-    max-height: calc(85vh - 150px);
-
-    // 完全隐藏滚动条
-    &::-webkit-scrollbar {
-      display: none;
-      width: 0;
-      height: 0;
+    // 模态框标题样式
+    .n-dialog__title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ll-text-2);
+      margin-right: var(--ll-space-4);
     }
 
-    // Firefox 隐藏滚动条
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
+    // 内容区域（长表单滚动，滚动条隐藏保持扁平观感）
+    .n-dialog__content {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-top: var(--ll-space-2);
 
-  // 底部操作栏
-  .n-dialog__action {
-    padding: 16px 24px;
-    border-top: 1px solid var(--n-divider-color);
-    background: var(--n-color-modal);
-  }
-}
-
-#langr-learn-panel-modal {
-  .form-actions {
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px dashed var(--n-divider-color);
-
-    .submit-button {
-      width: 100%;
-      height: 42px;
-      font-size: 15px;
-      font-weight: 500;
-      border-radius: 8px;
-      transition: all 0.2s ease;
-
-      &:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(var(--n-primary-color-rgb), 0.3);
+      &::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
       }
 
-      &:active {
-        transform: translateY(0);
+      // Firefox 隐藏滚动条
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    // 底部操作栏（固定，不随内容滚动）
+    .n-dialog__action {
+      padding: var(--ll-space-3) 24px;
+      border-top: 1px solid var(--ll-border);
+      background: var(--ll-surface-2);
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--ll-space-3);
+        width: 100%;
+      }
+
+      .submit-button {
+        min-width: 120px;
+        font-weight: 500;
+      }
+    }
+
+    // ── 窄屏适配：压缩内边距，内容区占满高度 ────────────────
+    @media (max-width: 560px) {
+      width: 94vw;
+      max-height: 92vh;
+
+      .n-dialog__title {
+        font-size: 13px;
+      }
+
+      .n-dialog__content {
+        padding-top: 0;
+      }
+
+      .n-dialog__action {
+        padding: var(--ll-space-2) var(--ll-space-3);
       }
     }
   }

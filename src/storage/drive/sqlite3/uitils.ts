@@ -1,5 +1,8 @@
-import {ConnectionsTable, ExpressionsTable, NotesTable, SentencesTable, TagsTable} from "@/storage/drive/types";
-import {QueryExecResult} from "sql.js";
+import {ConnectionsTable, ExpressionsTable, NotesTable, SentencesTable, Tables, TagsTable} from "@/storage/drive/types";
+import { ExpressionInfo } from "@/storage/interface";
+import initSqlJs, { Database, QueryExecResult, SqlJsConfig, SqlJsStatic } from "sql.js";
+import { normalizePath } from "obsidian";
+import Plugin from "@/plugin";
 
 /**
  * 通用映射函数：将sql.js原始结果转换为强类型TS对象数组
@@ -109,4 +112,113 @@ export function connectionsTableTransform(
         connection: rawObj?.connection,
         date: rawObj?.date,
     }
+}
+
+/**
+ * 加载 sql.js：优先读插件目录（或 node_modules，开发环境）里的 sql-wasm.wasm，
+ * 找不到再回退 CDN。sqlite3 驱动初始化与外层 transfer 解析 .sqlite 文件共用。
+ */
+export async function loadSqlJs(plugin: Plugin): Promise<SqlJsStatic> {
+    const adapter = plugin.app.vault.adapter;
+    const wasmName = "sql-wasm.wasm";
+    const pluginDir = normalizePath(".obsidian/plugins/" + plugin.manifest.id);
+
+    let wasmPath = normalizePath(pluginDir + "/" + wasmName);
+    // 插件目录没有时查 node_modules（开发环境）
+    if (!(await adapter.exists(wasmPath))) {
+        wasmPath = normalizePath("/node_modules/sql.js/dist/" + wasmName);
+    }
+
+    const config: SqlJsConfig = {};
+    if (await adapter.exists(wasmPath)) {
+        try {
+            if (typeof (adapter as any).readBinary === "function") {
+                config.wasmBinary = await (adapter as any).readBinary(wasmPath);
+            } else {
+                console.warn("adapter.readBinary 方法不可用，将从 CDN 加载 WASM 文件");
+            }
+        } catch (err) {
+            console.error("Failed to read WASM file:", err);
+            console.warn("将继续使用默认 WASM 加载方式（CDN）");
+        }
+    } else {
+        console.warn("sql-wasm.wasm not found at", wasmPath);
+        console.warn("将从 CDN 加载 WASM 文件");
+    }
+
+    return await initSqlJs(config);
+}
+
+/**
+ * 从一个（本插件 schema 的）SQLite 数据库实例抽取全部数据，转为统一的 ExpressionInfo 列表。
+ * 供 sqlite3 驱动导出与外层 transfer 解析 .sqlite 导入文件共用；只读，不修改传入的 db。
+ */
+export function extractAllDataFromDatabase(db: Database): ExpressionInfo[] {
+    const expressions: ExpressionInfo[] = [];
+
+    const exprsResult = db.exec("SELECT * FROM " + Tables.EXPRESSION);
+    if (exprsResult.length <= 0) {
+        return expressions;
+    }
+
+    const exprs = mapSqlResultToTypedArray<ExpressionsTable>(
+        exprsResult[0],
+        expressionsTableTransform
+    );
+
+    for (const expr of exprs) {
+        const info: ExpressionInfo = {
+            expression: expr.expression,
+            meaning: expr.meaning,
+            status: expr.status,
+            t: expr.t,
+            tags: [],
+            notes: [],
+            sentences: [],
+            connections: [],
+            date: expr.date,
+        };
+
+        const tagsResult = db.exec(
+            "SELECT tag FROM " + Tables.TAGS + " WHERE expression = ?",
+            [expr.expression]
+        );
+        if (tagsResult.length > 0) {
+            info.tags = tagsResult[0].values.map((row: any[]) => String(row[0] ?? ""));
+        }
+
+        const notesResult = db.exec(
+            "SELECT note FROM " + Tables.NOTES + " WHERE expression = ?",
+            [expr.expression]
+        );
+        if (notesResult.length > 0) {
+            info.notes = notesResult[0].values.map((row: any[]) => String(row[0] ?? ""));
+        }
+
+        const sentencesResult = db.exec(
+            "SELECT sentence, trans, origin, date FROM " + Tables.SENTENCE + " WHERE expression = ?",
+            [expr.expression]
+        );
+        if (sentencesResult.length > 0) {
+            info.sentences = sentencesResult[0].values.map((row: any[]) => ({
+                expression: expr.expression,
+                sentence: String(row[0] ?? ""),
+                trans: String(row[1] ?? ""),
+                origin: String(row[2] ?? ""),
+                date: row[3],
+            }));
+        }
+
+        const connsResult = db.exec(
+            "SELECT connection FROM " + Tables.CONNECTIONS + " WHERE expression = ?",
+            [expr.expression]
+        );
+        if (connsResult.length > 0) {
+            info.connections = connsResult[0].values.map((row: any[]) => String(row[0] ?? ""));
+        }
+
+        expressions.push(info);
+    }
+
+    return expressions;
 }

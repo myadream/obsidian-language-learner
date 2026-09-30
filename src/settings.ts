@@ -4,11 +4,13 @@ import {App, Notice, PluginSettingTab, Setting, debounce} from "obsidian";
 import LanguageLearner from "./plugin";
 import {t} from "./lang/helper";
 import enLocale from "./lang/locale/en";
-import {WarningModal, ImportFormatModal} from "./modals"
+import {WarningModal, ImportFormatModal, ExportFormatModal} from "./modals"
+import {importFromFile, exportToFile} from "./storage/transfer"
 import {dicts} from "@dict/list";
 import {LANGS} from "./langs";
 import store from "./store";
 import { StorageProviderDriveType } from "./storage/provider";
+import { DEFAULT_DRIVE_STORAGE_PATH } from "./storage/settings-normalize";
 import {ExpressionInfoSimple} from "@/storage/interface";
 
 export interface MyPluginSettings {
@@ -52,6 +54,34 @@ export interface StorageSetting {
     drive: { [K in string]: any };
 }
 
+// 存储 drive 配置的键与枚举值不同（sqlite 类型的配置键是 "sqlite3"）
+const DRIVE_CONFIG_KEY: Record<string, string> = {
+    [StorageProviderDriveType.SQLITE]: "sqlite3",
+    [StorageProviderDriveType.CSV]: "csv",
+    [StorageProviderDriveType.TEDB]: "tedb",
+    [StorageProviderDriveType.INDEXED]: "indexed",
+    [StorageProviderDriveType.API]: "api",
+};
+
+// 带库内目录表单的本地文件类驱动；sqlite/csv/tedb 表单待遇一致
+const LOCAL_DIR_TYPES = [
+    StorageProviderDriveType.SQLITE,
+    StorageProviderDriveType.CSV,
+    StorageProviderDriveType.TEDB,
+];
+
+// 各驱动 Database Dir 表单的描述文案（sqlite 无描述）
+type DirDescKey =
+    | "CSV files are stored under this vault folder"
+    | "TeDB data files are stored under this vault folder (desktop only)";
+
+const DIR_DESC: Partial<Record<StorageProviderDriveType, DirDescKey>> = {
+    [StorageProviderDriveType.CSV]: "CSV files are stored under this vault folder",
+    [StorageProviderDriveType.TEDB]: "TeDB data files are stored under this vault folder (desktop only)",
+};
+
+const DEFAULT_STORAGE_PATH = DEFAULT_DRIVE_STORAGE_PATH;
+
 export const DEFAULT_SETTINGS: MyPluginSettings = {
 
     self_server: false,
@@ -89,6 +119,11 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
             },
             "csv": {
                 storage_path: "storage",
+            },
+            "tedb": {
+                storage_path: "storage",
+                // relaxed 跳过 fsync 保留原子写（快约 2~3 倍）；strict 每写都 fsync
+                durability: "relaxed",
             },
 
         }
@@ -133,6 +168,20 @@ export class SettingTab extends PluginSettingTab {
         this.completionSettings(containerEl);
         this.reviewSettings(containerEl);
         // this.selfServerSettings(containerEl);
+    }
+
+    /**
+     * 驱动配置自愈读取：键缺失或形态非法时就地补空对象再返回。
+     * 正常情况下 loadSettings 的归一化已保证每个驱动键齐全，这里兜底
+     * 异常数据（如被外部编辑过的 data.json），保证设置页永不因缺键崩溃。
+     */
+    private driveConfig(storageType: StorageProviderDriveType): Record<string, any> {
+        const drive = this.plugin.settings.storage.drive;
+        const key = DRIVE_CONFIG_KEY[storageType] || storageType;
+        if (!drive[key] || typeof drive[key] !== "object") {
+            drive[key] = {};
+        }
+        return drive[key];
     }
 
     langSettings(containerEl: HTMLElement) {
@@ -278,6 +327,7 @@ export class SettingTab extends PluginSettingTab {
                 .addOption(StorageProviderDriveType.INDEXED, StorageProviderDriveType.INDEXED)
                 .addOption(StorageProviderDriveType.SQLITE, StorageProviderDriveType.SQLITE)
                 .addOption(StorageProviderDriveType.CSV, StorageProviderDriveType.CSV)
+                .addOption(StorageProviderDriveType.TEDB, StorageProviderDriveType.TEDB)
                 .setValue(this.plugin.settings.storage.storage_type)
                 .onChange(async (value: StorageProviderDriveType) => {
                     this.plugin.settings.storage.storage_type = value;
@@ -309,33 +359,44 @@ export class SettingTab extends PluginSettingTab {
             );
 
 
-        // 本地数据库写入类型
-        if (this.plugin.settings.storage.storage_type=== StorageProviderDriveType.SQLITE) {
-            new Setting(containerEl)
-                .setName(t("Database Dir"))
-                .addText(text => text
-                    .setValue(this.plugin.settings.storage.drive["sqlite3"]['storage_path'])
-                    .onChange(debounce(async (path) => {
-                        this.plugin.settings.storage.drive["sqlite3"]['storage_path'] = path;
-                        this.plugin.storage.sync(this.plugin);
+        // 本地文件类驱动（sqlite/csv/tedb）共用同一套 Database Dir 表单；
+        // driveConfig 内部自愈缺失键，切换存储类型后不会因 drive[type] undefined
+        // 抛 "reading 'storage_path'" 而中断 display()（下半个设置页随之消失）
+        const storageType = this.plugin.settings.storage.storage_type;
+        if (LOCAL_DIR_TYPES.includes(storageType)) {
+            const config = this.driveConfig(storageType);
+            const dirSetting = new Setting(containerEl).setName(t("Database Dir"));
+            const desc = DIR_DESC[storageType];
+            if (desc) {
+                dirSetting.setDesc(t(desc));
+            }
+            dirSetting.addText(text => text
+                .setValue(config.storage_path || DEFAULT_STORAGE_PATH)
+                .onChange(debounce(async (path) => {
+                    // 输入被清空时落默认值，避免持久化空路径
+                    config.storage_path = path.trim() || DEFAULT_STORAGE_PATH;
+                    this.plugin.storage.sync(this.plugin);
 
-                        await this.plugin.saveSettings();
-                    }, 1000, true))
-                );
+                    await this.plugin.saveSettings();
+                }, 1000, true))
+            );
         }
 
-        if (this.plugin.settings.storage.storage_type === StorageProviderDriveType.CSV) {
+        // tedb：库内相对目录 + 持久化等级（仅桌面端可用，移动端回退 IndexedDB）
+        if (storageType === StorageProviderDriveType.TEDB) {
             new Setting(containerEl)
-                .setName(t("Database Dir"))
-                .setDesc(t("CSV files are stored under this vault folder"))
-                .addText(text => text
-                    .setValue(this.plugin.settings.storage.drive["csv"]['storage_path'])
-                    .onChange(debounce(async (path) => {
-                        this.plugin.settings.storage.drive["csv"]['storage_path'] = path;
+                .setName(t("Durability"))
+                .setDesc(t("relaxed skips fsync (about 2-3x faster); strict fsyncs every write"))
+                .addDropdown(dropdown => dropdown
+                    .addOption("relaxed", "relaxed")
+                    .addOption("strict", "strict")
+                    .setValue(this.driveConfig(StorageProviderDriveType.TEDB).durability || "relaxed")
+                    .onChange(async (value: string) => {
+                        this.driveConfig(StorageProviderDriveType.TEDB).durability = value;
                         this.plugin.storage.sync(this.plugin);
 
                         await this.plugin.saveSettings();
-                    }, 1000, true))
+                    })
                 );
         }
 
@@ -412,7 +473,7 @@ export class SettingTab extends PluginSettingTab {
         // }
 
 
-        // 导入导出数据库
+        // 导入导出数据库（文件格式解析统一在外层 storage/transfer.ts，驱动只处理数据）
         new Setting(containerEl)
             .setName(t("Import & Export"))
             .setDesc(t("Warning: Import will override current database"))
@@ -421,7 +482,7 @@ export class SettingTab extends PluginSettingTab {
                 .onClick(async () => {
                     const modal = new ImportFormatModal(this.plugin.app, async (format: 'json' | 'csv' | 'sqlite3', file: File) => {
                         try {
-                            await this.plugin.storage.DB().importDB(file, format);
+                            await importFromFile(this.plugin, this.plugin.storage.DB(), file, format);
                             new Notice(t("Import successful"));
                         } catch (error) {
                             new Notice(t("Import failed: {0}", error.message || String(error)));
@@ -434,8 +495,16 @@ export class SettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText(t("Export"))
                 .onClick(async () => {
-                    await this.plugin.storage.DB().exportDB();
-                    new Notice("Exported");
+                    const modal = new ExportFormatModal(this.plugin.app, async (format: 'json' | 'csv') => {
+                        try {
+                            await exportToFile(this.plugin, this.plugin.storage.DB(), format);
+                            new Notice(t("Export successful"));
+                        } catch (error) {
+                            new Notice(t("Export failed: {0}", error.message || String(error)));
+                            console.error('Export error:', error);
+                        }
+                    });
+                    modal.open();
                 })
             );
         // 获取所有非无视单词
@@ -490,8 +559,8 @@ export class SettingTab extends PluginSettingTab {
                         this.app,
                         t("Are you sure you want to destroy your database?"),
                         async () => {
-                            this.plugin.storage.DB().destroyAll();
-                            this.plugin.storage.destroyed();
+                            await this.plugin.storage.DB().destroyAll();
+                            await this.plugin.storage.destroyed();
                             await this.plugin.storage.syncSetting(this.plugin).drive(this.plugin.settings.storage.storage_type);
 
                             new Notice("已清空");

@@ -16,7 +16,7 @@ export default {
     "Fail": "fail",
     "Edit": "edit",
     "Remove": "remove",
-    "Cancel": "cancel",
+    "Cancel": "Cancel",
 
 
     // SearchPanelView.ts
@@ -51,6 +51,7 @@ export default {
     "Familiar": "Familiar",
     "Known": "Known",
     "Learned": "Learned",
+    "Unknown": "Unknown",
     "Tags": "Tags",
     "Input or select some tags": "Input or select some tags",
     "Notes": "Notes",
@@ -65,6 +66,7 @@ export default {
     "Meaning is empty!": "Meaning is empty",
     "Expression is empty!": "Expression is empty",
     "Submit": "Submit",
+    "Edit Word": "Edit Word",
 
     // Stat.vue
     "Day Ignore": "Day Ignore",
@@ -169,6 +171,11 @@ export default {
     "Reset Filters": "Reset Filters",
     "View Details": "View Details",
     "Details": "Details",
+    "Word Details": "Word Details",
+    "Loading...": "Loading...",
+    "No more data": "No more data",
+    "And": "And",
+    "Or": "Or",
     "Today": "Today",
     "Yesterday": "Yesterday",
     "Added Date": "Added Date",
@@ -186,7 +193,15 @@ export default {
     "Close": "Close",
     "Showing {0} of {1} words": "Showing {0} of {1} words",
     "No words match the selected tags.": "No words match the selected tags.",
-    "No words found. Try adjusting your filters.": "No words found. Try adjusting your filters.",
+    "No words yet": "No words yet",
+    "No matching words": "No matching words",
+    "Start by adding your first word.": "Start by adding your first word.",
+    "Something went wrong": "Something went wrong",
+    "Newest first": "Newest first",
+    "Oldest first": "Oldest first",
+    "7-Day Trend": "7-Day Trend",
+    "Sort": "Sort",
+    "Filters": "Filters",
 
     "Reading Mode": "Reading Mode",
     "Default Paragraphs": "Default paragraphs",
@@ -234,7 +249,14 @@ export default {
     "Please select a file first": "Please select a file first",
     "Import successful": "Import successful",
     "Import failed: {0}": "Import failed: {0}",
-    "Importing SQLite3 database to IndexedDB is not supported. Please export your data from the source in JSON format instead.": "Importing SQLite3 database to IndexedDB is not supported. Please export your data from the source in JSON format instead.",
-    "Importing CSV to IndexedDB is not directly supported. Please use JSON format or switch to SQLite3 storage.": "Importing CSV to IndexedDB is not directly supported. Please use JSON format or switch to SQLite3 storage.",
-    "Unsupported format: {0}": "Unsupported format: {0}"
+    "Export to File": "Export to File",
+    "Export Format": "Export Format",
+    "Select the format of the file to export": "Select the format of the file to export",
+    "JSON format: Full data including words, meanings, statuses, tags, notes, sentences and connections. Recommended for backup and switching storage types.": "JSON format: Full data including words, meanings, statuses, tags, notes, sentences and connections. Recommended for backup and switching storage types.",
+    "CSV format: Expression,Meaning,Status,Type,Tags,Date (words only, no notes/sentences)": "CSV format: Expression,Meaning,Status,Type,Tags,Date (words only, no notes/sentences)",
+    "Export successful": "Export successful",
+    "Export failed: {0}": "Export failed: {0}",
+    "TeDB data files are stored under this vault folder (desktop only)": "TeDB data files are stored under this vault folder (desktop only)",
+    "Durability": "Durability",
+    "relaxed skips fsync (about 2-3x faster); strict fsyncs every write": "relaxed skips fsync (about 2-3x faster); strict fsyncs every write"
 };

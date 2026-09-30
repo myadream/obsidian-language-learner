@@ -17,33 +17,33 @@ export enum WordStatus {
  */
 export const StatusColors = {
     [WordStatus.Ignore]: {
-        main: '#d1d5db',      // 灰色
-        bg: 'rgba(209, 213, 219, 0.27)',      // #d1d5db with ~27% opacity
-        border: 'rgba(209, 213, 219, 0.4)',   // #d1d5db with 40% opacity
+        main: '#94a3b8',      // 石板灰
+        bg: 'rgba(148, 163, 184, 0.25)',
+        border: 'rgba(148, 163, 184, 0.45)',
         class: 'ignore'
     },
     [WordStatus.Learning]: {
-        main: '#f59e0b',      // 橙色
-        bg: 'rgba(245, 158, 11, 0.33)',       // #f59e0b with ~33% opacity
-        border: 'rgba(245, 158, 11, 0.4)',    // #f59e0b with 40% opacity
+        main: '#d97706',      // 琥珀橙
+        bg: 'rgba(245, 158, 11, 0.26)',
+        border: 'rgba(245, 158, 11, 0.5)',
         class: 'learning'
     },
     [WordStatus.Familiar]: {
-        main: '#3b82f6',      // 蓝色
-        bg: 'rgba(59, 130, 246, 0.33)',       // #3b82f6 with ~33% opacity
-        border: 'rgba(59, 130, 246, 0.4)',    // #3b82f6 with 40% opacity
+        main: '#2563eb',      // 蓝
+        bg: 'rgba(59, 130, 246, 0.24)',
+        border: 'rgba(59, 130, 246, 0.45)',
         class: 'familiar'
     },
     [WordStatus.Known]: {
-        main: '#22c55e',      // 绿色
-        bg: 'rgba(34, 197, 94, 0.33)',        // #22c55e with ~33% opacity
-        border: 'rgba(34, 197, 94, 0.4)',     // #22c55e with 40% opacity
+        main: '#16a34a',      // 绿
+        bg: 'rgba(34, 197, 94, 0.24)',
+        border: 'rgba(34, 197, 94, 0.45)',
         class: 'known'
     },
     [WordStatus.Learned]: {
-        main: '#10b981',      // 深绿色
-        bg: 'rgba(16, 185, 129, 0.33)',       // #10b981 with ~33% opacity
-        border: 'rgba(16, 185, 129, 0.4)',    // #10b981 with 40% opacity
+        main: '#0d9488',      // 青绿（品牌色）
+        bg: 'rgba(20, 184, 166, 0.24)',
+        border: 'rgba(20, 184, 166, 0.5)',
         class: 'learned'
     },
 } as const;

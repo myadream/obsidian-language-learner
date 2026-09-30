@@ -31,6 +31,7 @@ import {InputModal} from "./modals"
 
 import Global from "./views/Global.vue";
 import {ExpressionInfoSimple, WordType} from "@/storage/interface";
+import {normalizeStorageSetting} from "@/storage/settings-normalize";
 import { StorageProvider } from "./storage/provider";
 
 
@@ -110,7 +111,9 @@ export default class LanguageLearner extends Plugin {
         this.app.workspace.detachLeavesOfType(STAT_VIEW_TYPE);
         this.app.workspace.detachLeavesOfType(READING_VIEW_TYPE);
 
-        this.storage?.destroyed();
+        this.storage?.destroyed().catch((e) =>
+            console.error("[StorageProvider] flush on unload failed", e)
+        );
         // this.server?.close();
 
         this.vueApp.unmount();
@@ -567,7 +570,7 @@ export default class LanguageLearner extends Plugin {
         );
         for (const key in DEFAULT_SETTINGS) {
             const k = key as keyof typeof DEFAULT_SETTINGS;
-            if (k === "dictionaries" || data[k] === undefined) {
+            if (k === "dictionaries" || k === "storage" || data[k] === undefined) {
                 continue;
             }
 
@@ -578,17 +581,11 @@ export default class LanguageLearner extends Plugin {
             }
         }
 
-        // storage.drive 需要按驱动逐个合并默认值：
-        // 老配置的 drive 对象可能缺少新增驱动（如 sqlite3/csv）的键，
-        // 直接整体 Object.assign 会把默认驱动配置整个丢掉
-        const defaultDrive = DEFAULT_SETTINGS.storage.drive;
-        const savedDrive = settings.storage.drive || {};
-        settings.storage.drive = Object.fromEntries(
-            Object.keys(defaultDrive).map((key) => [
-                key,
-                Object.assign({}, defaultDrive[key], savedDrive[key]),
-            ])
-        );
+        // storage 整体走归一化：老配置缺新增驱动（csv/tedb）键时补默认值、
+        // 被清空的 storage_path 回填默认值、非法 storage_type 回退 indexed；
+        // 归一化输出全新对象，避免 Object.assign 把 DEFAULT_SETTINGS.storage
+        // 污染成共享引用（同一会话内二次加载会用脏默认值）
+        settings.storage = normalizeStorageSetting(data.storage);
 
         (this.settings as any) = settings;
     }
