@@ -32,10 +32,6 @@ export type HjdictResult = HjdictResultLex | HjdictResultRelated;
 
 type HjdictSearchResult = DictSearchResult<HjdictResult>;
 
-interface HjdictPayload {
-    langCode?: string;
-}
-
 export const search: SearchFunction<HjdictResult> = async (
     text: string,
     config,

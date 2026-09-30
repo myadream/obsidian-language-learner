@@ -197,8 +197,8 @@ const theme = computed(() => {
 
 // 输入单词时自动转小写
 const onExpressionInput = (value: string) => {
-    if (value && model.value.t === 'WORD') {
-        model.value.expression = value.toLowerCase();
+    if (value && props.model.t === 'WORD') {
+        props.model.expression = value.toLowerCase();
     }
 };
 </script>
@@ -259,11 +259,11 @@ const onExpressionInput = (value: string) => {
             }
 
             // 确保输入框占满宽度
-            :deep(.n-form-item-blank) {
+            .n-form-item-blank {
                 width: 100%;
             }
 
-            :deep(.n-input) {
+            .n-input {
                 width: 100%;
                 margin: 0;
             }
@@ -277,7 +277,7 @@ const onExpressionInput = (value: string) => {
             width: 100%;
             margin-bottom: 12px;
 
-            :deep(.n-dynamic-input-item__blank) {
+            .n-dynamic-input-item__blank {
                 width: 100%;
             }
         }

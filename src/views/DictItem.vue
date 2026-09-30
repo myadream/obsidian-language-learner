@@ -168,6 +168,7 @@ watch(
             bottom: 0;
             width: 100%;
             height: 50px;
+            z-index: 10;
             padding: 0;
             border: none;
             box-shadow: none;

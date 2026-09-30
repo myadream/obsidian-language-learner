@@ -29,7 +29,7 @@ const emits = defineEmits<{
 let result = ref("");
 
 async function onSearch(): Promise<boolean> {
-    let res = await search(props.word, plugin.settings.foreign);
+    let res = await search(props.word, plugin.settings.native, plugin.settings.foreign);
     if (!res) return false;
 
     result.value = res;

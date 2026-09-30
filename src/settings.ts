@@ -3,8 +3,10 @@ import {App, Notice, PluginSettingTab, Setting, debounce} from "obsidian";
 // import Server from "./api/server";
 import LanguageLearner from "./plugin";
 import {t} from "./lang/helper";
-import {WarningModal, OpenFileModal, ImportFormatModal} from "./modals"
+import enLocale from "./lang/locale/en";
+import {WarningModal, ImportFormatModal} from "./modals"
 import {dicts} from "@dict/list";
+import {LANGS} from "./langs";
 import store from "./store";
 import { StorageProviderDriveType } from "./storage/provider";
 import {ExpressionInfoSimple} from "@/storage/interface";
@@ -64,9 +66,8 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
     dictionaries: {
         "youdao": {enable: true, priority: 1},
         "cambridge": {enable: true, priority: 2},
-        "jukuu": {enable: true, priority: 3},
-        "hjdict": {enable: true, priority: 4},
-        "deepl": {enable: true, priority: 5},
+        "hjdict": {enable: true, priority: 3},
+        "deepl": {enable: true, priority: 4},
     },
     dict_height: "250px",
 
@@ -84,6 +85,9 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
             "indexed": {
             },
             "sqlite3":{
+                storage_path: "storage",
+            },
+            "csv": {
                 storage_path: "storage",
             },
 
@@ -136,31 +140,36 @@ export class SettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t("Native"))
-            .addDropdown(native => native
-                .addOption("zh", t("Chinese"))
-                .setValue(this.plugin.settings.native)
-                .onChange(async (value) => {
-                    this.plugin.settings.native = value;
-                    await this.plugin.saveSettings();
-                    this.display();
-                })
+            .addDropdown(native => {
+                for (const lang of LANGS) {
+                    native.addOption(lang.code, t(lang.nameKey as keyof typeof enLocale));
+                }
+                native
+                    .setValue(this.plugin.settings.native)
+                    .onChange(async (value) => {
+                        this.plugin.settings.native = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+                return native;
+            }
             );
 
         new Setting(containerEl)
             .setName(t("Foreign"))
-            .addDropdown(foreign => foreign
-                .addOption("en", t("English"))
-                .addOption("jp", t("Japanese"))
-                .addOption("kr", t("Korean"))
-                .addOption("fr", t("French"))
-                .addOption("de", t("Deutsch"))
-                .addOption("es", t("Spanish"))
-                .setValue(this.plugin.settings.foreign)
-                .onChange(async (value) => {
-                    this.plugin.settings.foreign = value;
-                    await this.plugin.saveSettings();
-                    this.display();
-                })
+            .addDropdown(foreign => {
+                for (const lang of LANGS) {
+                    foreign.addOption(lang.code, t(lang.nameKey as keyof typeof enLocale));
+                }
+                foreign
+                    .setValue(this.plugin.settings.foreign)
+                    .onChange(async (value) => {
+                        this.plugin.settings.foreign = value;
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+                return foreign;
+            }
             );
 
     }
@@ -240,7 +249,11 @@ export class SettingTab extends PluginSettingTab {
         };
 
         Object.keys(dicts).forEach((dict: keyof typeof dicts) => {
-            createDictSetting(dict, dicts[dict].name, dicts[dict].description);
+            // 当前母语下不可用的词典不展示设置项
+            if (!dicts[dict].nativeLangs.includes(this.plugin.settings.native)) {
+                return;
+            }
+            createDictSetting(dict, dicts[dict].name, dicts[dict].description(this.plugin.settings.native));
         });
 
         new Setting(containerEl)
@@ -263,8 +276,8 @@ export class SettingTab extends PluginSettingTab {
             .setName(t("Database Type"))
             .addDropdown(funcKey => funcKey
                 .addOption(StorageProviderDriveType.INDEXED, StorageProviderDriveType.INDEXED)
-                .addOption(StorageProviderDriveType.API, StorageProviderDriveType.API)
                 .addOption(StorageProviderDriveType.SQLITE, StorageProviderDriveType.SQLITE)
+                .addOption(StorageProviderDriveType.CSV, StorageProviderDriveType.CSV)
                 .setValue(this.plugin.settings.storage.storage_type)
                 .onChange(async (value: StorageProviderDriveType) => {
                     this.plugin.settings.storage.storage_type = value;
@@ -304,6 +317,21 @@ export class SettingTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.storage.drive["sqlite3"]['storage_path'])
                     .onChange(debounce(async (path) => {
                         this.plugin.settings.storage.drive["sqlite3"]['storage_path'] = path;
+                        this.plugin.storage.sync(this.plugin);
+
+                        await this.plugin.saveSettings();
+                    }, 1000, true))
+                );
+        }
+
+        if (this.plugin.settings.storage.storage_type === StorageProviderDriveType.CSV) {
+            new Setting(containerEl)
+                .setName(t("Database Dir"))
+                .setDesc(t("CSV files are stored under this vault folder"))
+                .addText(text => text
+                    .setValue(this.plugin.settings.storage.drive["csv"]['storage_path'])
+                    .onChange(debounce(async (path) => {
+                        this.plugin.settings.storage.drive["csv"]['storage_path'] = path;
                         this.plugin.storage.sync(this.plugin);
 
                         await this.plugin.saveSettings();
@@ -457,7 +485,7 @@ export class SettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText(t("Destroy"))
                 .setWarning()
-                .onClick(async (evt) => {
+                .onClick(async () => {
                     const modal = new WarningModal(
                         this.app,
                         t("Are you sure you want to destroy your database?"),
@@ -610,7 +638,7 @@ export class SettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName(t("Accent"))
-            .setDesc(t("Choose your preferred accent"))
+            .setDesc(t("Choose your preferred accent") + " (" + t("Only applies to English") + ")")
             .addDropdown(accent => accent
                 .addOption("0", t("American"))
                 .addOption("1", t("British"))

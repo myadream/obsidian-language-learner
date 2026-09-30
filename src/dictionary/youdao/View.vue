@@ -8,10 +8,14 @@
         </div>
         <div class="meaning" style="margin-bottom: 10px;" v-html="meaningHTML"></div>
         <div class="translation" v-html="translationHTML" />
-        <button v-for="sub in ['柯林斯', '辨析', '词组', '同根词']" @click="curPanel = sub"
-            :style="curPanel === sub ? 'background-color:#483699;color:white;' : ''">
-            {{ sub }}
-        </button>
+        <div class="youdao-tabs">
+            <div class="tab-glider" :style="{ transform: `translateX(${tabIndex * 100}%)` }"></div>
+            <button v-for="sub in tabsList" :key="sub"
+                class="youdao-tab-item" :class="{ active: curPanel === sub }"
+                @click="curPanel = sub">
+                {{ sub }}
+            </button>
+        </div>
         <Collins class="collins" v-if="curPanel === '柯林斯'" :mydata="collins" />
         <div class="discrimination" v-else-if="curPanel === '辨析'" v-html="discriminationHTML"></div>
         <div class="word-group" v-else-if="curPanel === '词组'" v-html="wordGroupHTML"></div>
@@ -20,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 import Collins from "./YDCollins.vue"
 import { search, YoudaoResultLex } from "./engine"
@@ -42,7 +46,9 @@ let word = ref("")
 let meaningHTML = ref("")
 let translationHTML = ref("")
 let prons = ref([])
+const tabsList = ['柯林斯', '辨析', '词组', '同根词']
 let curPanel = ref("柯林斯")
+const tabIndex = computed(() => tabsList.indexOf(curPanel.value))
 let collins = ref([{}])
 let discriminationHTML = ref("")
 let wordGroupHTML = ref("")
@@ -73,6 +79,59 @@ useLoading(() => props.word, "youdao", onSearch, emits);
 
 <style lang="scss">
 #youdao {
+    .youdao-tabs {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background-color: var(--background-modifier-form-field, var(--background-secondary-alt, rgba(128, 128, 128, 0.12)));
+        padding: 3px;
+        border-radius: var(--radius-s, 6px);
+        margin: 8px 0 10px 0;
+        user-select: none;
+
+        .tab-glider {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 3px;
+            width: calc((100% - 6px) / 4);
+            background-color: var(--interactive-accent, #7f6df2);
+            border-radius: var(--radius-xs, 4px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .youdao-tab-item {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            padding: 4px 6px;
+            font-size: 0.82em;
+            font-weight: 500;
+            text-align: center;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: var(--radius-xs, 4px);
+            cursor: pointer;
+            box-shadow: none;
+            transition: color 0.18s ease, font-weight 0.18s ease;
+
+            &:hover:not(.active) {
+                color: var(--text-normal);
+                box-shadow: none;
+            }
+
+            &.active {
+                color: var(--text-on-accent, #ffffff);
+                font-weight: 600;
+                background: transparent;
+                box-shadow: none;
+            }
+        }
+    }
     h2 {
         font-size: 1.3em;
         font-weight: 700;

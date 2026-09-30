@@ -235,7 +235,7 @@ export function useSearchListener(model: any, plugin: Plugin, view: LearnPanelVi
                                 .match(/<p>([^<>]+)<\/p>/g)[1]
                                 ?.match(/<p>(.*)<\/p>/)[1] ?? null;
                     }
-                } catch (e) {
+                } catch {
                     filledTrans = "";
                 }
             }

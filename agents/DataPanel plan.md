@@ -1,5 +1,8 @@
 # DataPanel 完善计划
 
+> **状态**：✅ 已完结归档（历史方案）
+> **最后同步**：2026-09-30 —— 存储层已改为三驱动统一契约（indexed / sqlite / csv），本文"后端数据库"相关描述已同步修正；当前架构总览以根目录 [agent.md](../agent.md) 为准。
+
 ## 📋 概述
 设计并完善 DataPanel.vue 页面布局和样式，使用统一的卡片列表视图（不区分 PC 和移动端），实现**无限滚动加载**分页、筛选和完整的交互功能。
 
@@ -29,22 +32,23 @@
    - 筛选和排序参数传递
    - 滚动容器和防抖处理
 
-2. **Sqlite3StorageDrive** (后端数据库)
-   - `getAllExpressionSimple` 方法支持分页
+2. **StorageDrive 存储驱动** (后端数据库)
+   - `getAllExpressionSimple` 为三驱动统一契约，参数序 `(ignores, sort, search, paginate)`
+   - **三个实现行为一致**：IndexedDB (Dexie v2)、SQLite3 (sql.js)、CSV（2026-09-30 新增），DataPanel 不感知具体驱动
    - 支持 tags 数组搜索（OR 逻辑）
    - 返回分页结果：{ data[], total, page, pageSize }
 
-2. **WordCardList.vue** (卡片列表)
+3. **WordCardList.vue** (卡片列表)
    - CSS Grid 响应式布局
    - TransitionGroup 列表动画
    - 固定最小高度（180px）避免抖动
 
-3. **WordMoreModal.vue** (详情弹窗)
+4. **WordMoreModal.vue** (详情弹窗)
    - NModal 包装的详情展示
    - 支持复制笔记/例句
    - 优化的高亮显示
 
-4. **子组件**
+5. **子组件**
    - ActionButtons：操作按钮（含导出）
    - SearchFilterPanel：搜索和筛选
    - TagFilter：标签筛选（AND/OR）
@@ -59,9 +63,9 @@
   - search: { expression, meaning, status, t, tags[] }
   - sort: { field, order }
     ↓
-后端 API (getAllExpressionSimple)
+存储驱动契约 (getAllExpressionSimple，indexed/sqlite/csv 三实现统一)
   - 应用所有筛选条件（包括标签）
-  - 执行分页查询 (LIMIT + OFFSET)
+  - 执行分页查询（SQL LIMIT+OFFSET / 内存分页）
   - 返回: { data[], total, page, pageSize }
     ↓
 前端处理响应:
@@ -73,10 +77,11 @@ WordCardList 显示 (data)
 ```
 
 **设计说明**：
-- **真正的后端分页**：每次滚动加载时调用后端 API，传递分页参数
-- **后端筛选**：expression、meaning、status、type、sort、**tags**（所有筛选都在后端）
-- **前端展示**：直接显示后端返回的数据，无需二次筛选
-- **性能优化**：按需加载，减少初始加载时间，节省网络流量
+- **真正的后端分页**：每次滚动加载时调用存储驱动，传递分页参数
+- **驱动内筛选**：expression、meaning、status、type、sort、**tags**（所有筛选都在存储驱动内完成）
+- **前端展示**：直接显示返回的数据，无需二次筛选
+- **性能优化**：按需加载，减少初始加载时间
+- **行为基准**：三驱动的一致性由 `tests/storage/drive-contract.test.ts` 契约测试保证，改动存储行为先改契约测试
 
 ## 🎨 样式规范
 
@@ -296,7 +301,7 @@ WordCardList 显示 (data)
 
 **完成度**: 100%
 
-**最后更新**: 2026-01-03（升级为真正的后端分页加载）
+**最后更新**: 2026-01-03（升级为真正的后端分页加载）；2026-09-30（同步三驱动统一契约架构）
 
 ---
 

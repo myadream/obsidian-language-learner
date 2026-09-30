@@ -66,6 +66,12 @@ export default {
     // "Single day": "單日",
     "Accumulated": "累計",
     "Statistics": "統計",
+    "Total Words": "總詞彙量",
+    "Learning Words": "在學詞彙",
+    "Ignored Words": "無視詞彙",
+    "In Learning": "在學",
+    "Word Ratio": "詞彙比例",
+    "Learning Distribution": "在學詞彙分布",
 
     // settings
     "Use Server": "使用伺服器",
@@ -79,12 +85,15 @@ export default {
     "Native": "母語",
     "Foreign": "外語",
     "Chinese": "中",
+    "Traditional Chinese": "繁",
     "English": "英",
     "Japanese": "日",
     "Korean": "韓",
     "French": "法",
     "Deutsch": "德",
     "Spanish": "西",
+    "Only applies to English": "僅對英語生效",
+    "CSV files are stored under this vault folder": "CSV 檔案儲存在庫內的該目錄下",
 
     "Translate": "查字",
     "Word Select": "劃詞翻譯",
@@ -94,7 +103,6 @@ export default {
     "Dictionaries": "詞典",
     "Youdao": "有道詞典",
     "Cambridge": "劍橋詞典",
-    "Jukuu": "句酷",
     "Hujiang": "滬江小D",
 
     "Word Database Path": "單字資料庫路徑",

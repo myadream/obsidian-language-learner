@@ -1,5 +1,4 @@
 // from ext-saladict: https://github.com/crimx/ext-saladict
-import { Notice } from "obsidian";
 import {
   getText,
   getInnerHTML,

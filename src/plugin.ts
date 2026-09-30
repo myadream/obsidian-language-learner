@@ -17,7 +17,6 @@ import {READING_ICON, READING_VIEW_TYPE, ReadingView} from "./views/ReadingView"
 import {LEARN_ICON, LEARN_PANEL_VIEW, LearnPanelView} from "./views/LearnPanelView";
 import {STAT_ICON, STAT_VIEW_TYPE, StatView} from "./views/StatView";
 import {DATA_ICON, DATA_PANEL_VIEW, DataPanelView} from "./views/DataPanelView";
-// import {PDF_FILE_EXTENSION, PDFView, VIEW_TYPE_PDF} from "./views/PDFView";
 
 import {t} from "./lang/helper";
 import {TextParser} from "./views/parser";
@@ -26,7 +25,7 @@ import {FrontMatterManager} from "./utils/frontmatter";
 
 import {DEFAULT_SETTINGS, MyPluginSettings, SettingTab} from "./settings";
 import store from "./store";
-import {playAudio} from "./utils/helpers";
+import {speakWord} from "./utils/pronounce";
 import type {Position} from "./constant";
 import {InputModal} from "./modals"
 
@@ -82,8 +81,6 @@ export default class LanguageLearner extends Plugin {
         // 	callback: () => new Notice("hello!")
         // })
 
-        // await this.replacePDF()
-
         this.initStore();
 
         this.addCommands();
@@ -115,9 +112,6 @@ export default class LanguageLearner extends Plugin {
 
         this.storage?.destroyed();
         // this.server?.close();
-        // if (await app.vault.adapter.exists(".obsidian/plugins/obsidian-language-learner/pdf/web/viewer.html")) {
-        //     this.registerExtensions([PDF_FILE_EXTENSION], "pdf");
-        // }
 
         this.vueApp.unmount();
         this.appEl.remove();
@@ -129,28 +123,6 @@ export default class LanguageLearner extends Plugin {
             platform: Platform.isMobile ? "mobile" : "desktop",
         };
     }
-
-    // async replacePDF() {
-    //     if (await app.vault.adapter.exists(
-    //         ".obsidian/plugins/obsidian-language-learner/pdf/web/viewer.html"
-    //     )) {
-    //         this.registerView(VIEW_TYPE_PDF, (leaf) => {
-    //             return new PDFView(leaf);
-    //         });
-
-    //         (this.app as any).viewRegistry.unregisterExtensions([
-    //             PDF_FILE_EXTENSION,
-    //         ]);
-    //         this.registerExtensions([PDF_FILE_EXTENSION], VIEW_TYPE_PDF);
-
-    //         this.registerDomEvent(window, "message", (evt) => {
-    //             if (evt.data.type === "search") {
-    //                 // if (evt.data.funckey || this.store.searchPinned)
-    //                 this.queryWord(evt.data.selection);
-    //             }
-    //         });
-    //     }
-    // }
 
     initStore() {
         this.store.dark = document.body.hasClass("theme-dark");
@@ -206,7 +178,7 @@ export default class LanguageLearner extends Plugin {
             SEARCH_PANEL_VIEW,
             (leaf) => new SearchPanelView(leaf, this)
         );
-        this.addRibbonIcon(SEARCH_ICON, t("Open word search panel"), (evt) => {
+        this.addRibbonIcon(SEARCH_ICON, t("Open word search panel"), () => {
             this.activateView(SEARCH_PANEL_VIEW, "left");
         });
 
@@ -215,7 +187,7 @@ export default class LanguageLearner extends Plugin {
             LEARN_PANEL_VIEW,
             (leaf) => new LearnPanelView(leaf, this)
         );
-        this.addRibbonIcon(LEARN_ICON, t("Open new word panel"), (evt) => {
+        this.addRibbonIcon(LEARN_ICON, t("Open new word panel"), () => {
             this.activateView(LEARN_PANEL_VIEW, "right");
         });
 
@@ -227,7 +199,7 @@ export default class LanguageLearner extends Plugin {
 
         //注册统计视图
         this.registerView(STAT_VIEW_TYPE, (leaf) => new StatView(leaf, this));
-        this.addRibbonIcon(STAT_ICON, t("Open statistics"), async (evt) => {
+        this.addRibbonIcon(STAT_ICON, t("Open statistics"), async () => {
             this.activateView(STAT_VIEW_TYPE, "right");
         });
 
@@ -236,7 +208,7 @@ export default class LanguageLearner extends Plugin {
             DATA_PANEL_VIEW,
             (leaf) => new DataPanelView(leaf, this)
         );
-        this.addRibbonIcon(DATA_ICON, t("Data Panel"), async (evt) => {
+        this.addRibbonIcon(DATA_ICON, t("Data Panel"), async () => {
             this.activateView(DATA_PANEL_VIEW, "tab");
         });
     }
@@ -286,7 +258,7 @@ export default class LanguageLearner extends Plugin {
 
         const classified: number[][] = Array(5)
             .fill(0)
-            .map(_ => []);
+            .map((): number[] => []);
         words.forEach((word: ExpressionInfoSimple, i: number) => {
             classified[word.status].push(i);
         });
@@ -490,11 +462,11 @@ export default class LanguageLearner extends Plugin {
         }));
 
         if (this.settings.auto_pron) {
-            const accent = this.settings.review_prons;
-            const wordUrl =
-                `http://dict.youdao.com/dictvoice?type=${accent}&audio=` +
-                encodeURIComponent(word);
-            playAudio(wordUrl);
+            speakWord(word, {
+                native: this.settings.native,
+                foreign: this.settings.foreign,
+                accent: this.settings.review_prons,
+            });
         }
     }
 
@@ -513,7 +485,7 @@ export default class LanguageLearner extends Plugin {
         this.registerEvent(
             this.app.workspace.on(
                 "editor-menu",
-                (menu: Menu, editor: Editor, view: MarkdownView) => {
+                (menu: Menu, editor: Editor, _view: MarkdownView) => {
                     const selection = editor.getSelection();
                     if (selection || selection.trim().length === selection.length) {
                         addMemu(menu, selection);
@@ -567,24 +539,35 @@ export default class LanguageLearner extends Plugin {
                 target.matchParent(".sr-modal-content")
             ) {
                 const word = target.textContent;
-                const accent = this.settings.review_prons;
-                const wordUrl =
-                    `http://dict.youdao.com/dictvoice?type=${accent}&audio=` +
-                    encodeURIComponent(word);
-                playAudio(wordUrl);
+                speakWord(word, {
+                    native: this.settings.native,
+                    foreign: this.settings.foreign,
+                    accent: this.settings.review_prons,
+                });
             }
         });
     }
 
     async loadSettings() {
+        const data = (await this.loadData()) || {};
+        const savedDictionaries =
+            typeof data.dictionaries === "object" && data.dictionaries !== null
+                ? data.dictionaries
+                : {};
+        const dictionaries = Object.fromEntries(
+            Object.entries(DEFAULT_SETTINGS.dictionaries).map(([id, defaults]) => [
+                id,
+                Object.assign({}, defaults, savedDictionaries[id]),
+            ])
+        );
         const settings: { [K in string]: any } = Object.assign(
             {},
-            DEFAULT_SETTINGS
+            DEFAULT_SETTINGS,
+            { dictionaries }
         );
-        const data = (await this.loadData()) || {};
         for (const key in DEFAULT_SETTINGS) {
             const k = key as keyof typeof DEFAULT_SETTINGS;
-            if (data[k] === undefined) {
+            if (k === "dictionaries" || data[k] === undefined) {
                 continue;
             }
 
@@ -594,12 +577,20 @@ export default class LanguageLearner extends Plugin {
                 settings[k] = data[k];
             }
         }
+
+        // storage.drive 需要按驱动逐个合并默认值：
+        // 老配置的 drive 对象可能缺少新增驱动（如 sqlite3/csv）的键，
+        // 直接整体 Object.assign 会把默认驱动配置整个丢掉
+        const defaultDrive = DEFAULT_SETTINGS.storage.drive;
+        const savedDrive = settings.storage.drive || {};
+        settings.storage.drive = Object.fromEntries(
+            Object.keys(defaultDrive).map((key) => [
+                key,
+                Object.assign({}, defaultDrive[key], savedDrive[key]),
+            ])
+        );
+
         (this.settings as any) = settings;
-        // this.settings = Object.assign(
-        //     {},
-        //     DEFAULT_SETTINGS,
-        //     await this.loadData()
-        // );
     }
 
     async saveSettings() {

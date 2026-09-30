@@ -112,8 +112,9 @@ export class TextParser {
 
     // Plugin：在retextEnglish基础上，把AST上一些单词包裹成短语
     addPhrases() {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const selfThis = this;
-        return function (this: any, options = {}) {
+        return function (this: any, _options = {}) {
             // 使用 AST 转换器而不是修改 Parser
             return (tree: Root, file: any, next: any) => {
                 try {
@@ -129,7 +130,7 @@ export class TextParser {
 
     phraseModifier = modifyChildren(this.wrapWord2Phrase.bind(this));
 
-    wrapWord2Phrase(node: Content, index: number, parent: Parent) {
+    wrapWord2Phrase(node: Content, _index: number, _parent: Parent) {
         if (!node.hasOwnProperty("children")) return;
 
         if (
@@ -181,6 +182,7 @@ export class TextParser {
 
     // Compiler部分: 在AST转换为string时包裹上相应标签
     stringfy2HTML() {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const selfThis = this;
         return function () {
             Object.assign(this, {

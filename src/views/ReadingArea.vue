@@ -85,7 +85,7 @@ import {
     NInput,
     GlobalThemeOverrides,
 } from "naive-ui";
-import { MarkdownRenderer, Platform  } from "obsidian";
+import { MarkdownRenderer, Platform, normalizePath } from "obsidian";
 import PluginType from "@/plugin";
 import { t } from "@/lang/helper";
 import { useEvent } from "@/utils/use";
@@ -114,8 +114,16 @@ const themeConfig: GlobalThemeOverrides = {
 };
 
 // 音频源处理 - 保留原始路径，让 AudioPlayer 组件处理路径转换
-let frontMatter = plugin.app.metadataCache.getFileCache(view.file).frontmatter;
-let audioSource = (frontMatter["langr-audio"] || "") as string;
+// getFileCache 在文件刚同步、索引未就绪时可能返回 null，判空避免挂载崩溃导致白屏
+let frontMatter = plugin.app.metadataCache.getFileCache(view.file)?.frontmatter;
+let audioSource = (frontMatter?.["langr-audio"] || "") as string;
+
+// ~/ 开头为库内绝对路径，统一解析为跨平台资源 URL（桌面 app://local/，移动端 capacitor）
+if (audioSource.startsWith("~/")) {
+    audioSource = plugin.app.vault.adapter.getResourcePath(
+        normalizePath(audioSource.slice(2))
+    );
+}
 
 // 音频事件处理
 function onAudioLoaded() {
@@ -139,11 +147,13 @@ async function afterNoteLeave() {
 let renderedNote = ref<HTMLElement>();
 watchEffect(async (clean) => {
     if (!renderedNote.value) return;
+    // 第 4 参必须传 Component（view 即所在 ItemView），否则嵌入内容注册的
+    // 全局事件无法随视图卸载清理，Obsidian 会告警内存泄漏
     await MarkdownRenderer.renderMarkdown(
         notes.value,
         renderedNote.value,
         view.file.path,
-        null
+        view
     );
     clean(() => {
         renderedNote.value?.empty();

@@ -112,8 +112,9 @@ const processedAudioSource = computed(() => {
 
     const source = props.audioSource.trim();
 
-    // 如果是 HTTP(S) URL，直接返回
-    if (source.startsWith("http://") || source.startsWith("https://")) {
+    // 任意带协议的绝对 URL（http/https/app://local 等）直接返回，
+    // ReadingArea 已把 ~/ 库内路径解析为 getResourcePath 的结果
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(source)) {
         return source;
     }
 

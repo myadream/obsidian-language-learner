@@ -7,7 +7,7 @@ import {
 
 
 export interface GetSrcPageFunction {
-    (text: string): string;
+    (text: string, config?: any): string;
 }
 
 export interface SearchFunction<Result> {

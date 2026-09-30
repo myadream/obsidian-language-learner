@@ -435,10 +435,15 @@ const expressions = async () => {
         // 更新 hasMore 状态
         hasMore.value = data.value.length < response.total;
 
-        // 只在第一次加载时获取标签
-        if (tags.value.length === 0) {
+        // 只加载一次标签集（即使为空）。
+        // 历史死循环：此前用 `tags.value.length === 0` 判断，标签集为空的用户
+        // 每次加载都会重新赋值 tags/checkedTags（新数组引用），
+        // 触发下方 watch → 回调再次 expressions() → 无限循环反复重载页面
+        if (!tagsLoaded) {
+            tagsLoaded = true;
             tags.value = await plugin.storage.DB().getTags();
-            checkedTags.value = Array(tags.value.length).map((_) => false);
+            // Array(n) 是稀疏数组，map 不会执行，必须用 fill
+            checkedTags.value = Array(tags.value.length).fill(false);
         }
     } catch (err) {
         console.error("Failed to load expressions:", err);
@@ -536,9 +541,10 @@ const downloadFile = (content: string, filename: string, mimeType: string) => {
     URL.revokeObjectURL(url);
 };
 
-onMounted(() => {
+onMounted(async () => {
     loadPrefs(); // 加载用户偏好
-    expressions();
+    await expressions();
+    ready = true;
     setupInfiniteScroll();
 });
 
@@ -551,6 +557,9 @@ let data = ref<Row[]>([]);
 let mode = ref("and");
 let tags = ref<string[]>([]);
 let checkedTags = ref<boolean[]>([]);
+let tagsLoaded = false;
+/** 初始加载完成前，tags/checkedTags 的程序性赋值不应触发重查 */
+let ready = false;
 
 // 根据标签筛选数据（优化：缓存选中的标签数组）
 const selectedTags = computed(() => {
@@ -564,7 +573,7 @@ const filteredData = computed(() => {
 
 // 监听标签变化，重新加载数据（从后端获取）
 watch([selectedTags, mode], () => {
-    console.log('Tags filter changed:', selectedTags.value, 'Mode:', mode.value);
+    if (!ready) return;
     // 标签筛选改变时重置并重新加载
     currentPage.value = 0;
     data.value = [];

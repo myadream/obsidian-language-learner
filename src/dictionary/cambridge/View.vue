@@ -9,9 +9,12 @@
 
 <script setup lang="ts">
 import { Notice } from "obsidian";
-import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, watch, onMounted, onUnmounted, nextTick, getCurrentInstance } from "vue";
 import { CambridgeResult, search } from "./engine";
 import { useLoading } from "@dict/uses"
+import PluginType from "@/plugin";
+
+const plugin = getCurrentInstance().appContext.config.globalProperties.plugin as PluginType;
 
 const props = defineProps<{
     word: string;
@@ -24,7 +27,7 @@ const emits = defineEmits<{
 let result = ref<CambridgeResult>([]);
 
 async function onSearch(): Promise<boolean> {
-    let res = await search(props.word);
+    let res = await search(props.word, { native: plugin.settings.native });
     if (!res) return false;
 
     result.value = res.result;
@@ -43,9 +46,11 @@ onMounted(() => {
         // console.log(target)
         if (target.tagName === "HEADER" && target.hasClass("ca_h") || target.matchParent("header.ca_h")) {
             let section = target.matchParent("section");
-            section.hasClass("expand") ?
-                section.removeClass("expand") :
+            if (section.hasClass("expand")) {
+                section.removeClass("expand");
+            } else {
                 section.addClass("expand");
+            }
         }
     });
 })

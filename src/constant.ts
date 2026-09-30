@@ -1,4 +1,4 @@
-import { t } from "./lang/helper";
+// import { t } from "./lang/helper";
 
 const dict = {
     NAME: "Language Learner"

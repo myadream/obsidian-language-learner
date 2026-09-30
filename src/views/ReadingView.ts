@@ -1,8 +1,8 @@
-import { Menu, TextFileView, WorkspaceLeaf, Notice } from 'obsidian';
+import { Menu, TextFileView, WorkspaceLeaf } from 'obsidian';
 import { App as VueApp, createApp } from 'vue';
 
 import LanguageLearner from '@/plugin';
-import ReadingArea from 'ReadingArea.vue';
+import ReadingArea from './ReadingArea.vue';
 import { t } from "@/lang/helper";
 
 
@@ -31,7 +31,7 @@ export class ReadingView extends TextFileView {
         return this.data;
     }
 
-    async setViewData(data: string, clear?: boolean) {
+    async setViewData(data: string, _clear?: boolean) {
         this.text = data;
 
         if (this.firstInit) {
@@ -195,8 +195,8 @@ export class ReadingView extends TextFileView {
                 let children = senEl.children;
                 let idx = -1;
                 while (idx++ < children.length) {
-                    let container;
-                    if (container = isMatch(children[idx], words)) {
+                    const container = isMatch(children[idx], words);
+                    if (container) {
 
                         let phraseEl = createSpan({ cls: `phrase ${statusMap[status]}` });
                         senEl.insertBefore(phraseEl, children[idx]);

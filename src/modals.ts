@@ -1,4 +1,3 @@
-import { text } from "node:stream/consumers";
 import { App, Modal, Setting, Notice } from "obsidian";
 import { t } from "./lang/helper";
 
@@ -27,7 +26,7 @@ class InputModal extends Modal {
             }
         });
 
-        inputEl.addEventListener("input", (evt) => {
+        inputEl.addEventListener("input", () => {
             this.text = inputEl.value;
         });
 
@@ -68,7 +67,7 @@ class OpenFileModal extends Modal {
         new Setting(contentEl)
             .addButton(button => button
                 .setButtonText(t("Yes"))
-                .onClick((evt) => {
+                .onClick(() => {
                     this.onSubmit(this.file);
                     this.close();
                 })

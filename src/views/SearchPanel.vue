@@ -43,7 +43,7 @@ let map: { [K in string]: number } = {};
 let loadings = ref<boolean[]>([]);
 let shows = ref<boolean[]>([]);
 watch(() => plugin.store.dictsChange, () => {
-    let collection = Object.keys(plugin.settings.dictionaries)
+    let collection = Object.keys(dicts)
         .map((dict: keyof typeof dicts) => {
             return {
                 id: dict,
@@ -51,7 +51,9 @@ watch(() => plugin.store.dictsChange, () => {
                 name: dicts[dict].name,
             };
         })
-        .filter((dict) => plugin.settings.dictionaries[dict.id].enable);
+        .filter((dict) => plugin.settings.dictionaries[dict.id].enable)
+        // 只显示支持当前母语的词典
+        .filter((dict) => dicts[dict.id].nativeLangs.includes(plugin.settings.native));
     collection.sort((a, b) => a.priority - b.priority);
 
     components.value = collection.map((dict) => {

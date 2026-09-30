@@ -72,6 +72,12 @@ export default {
     // "Single day": "Single day",
     "Accumulated": "Accumulated",
     "Statistics": "Statistics",
+    "Total Words": "Total Words",
+    "Learning Words": "Learning Words",
+    "Ignored Words": "Ignored Words",
+    "In Learning": "In Learning",
+    "Word Ratio": "Word Ratio",
+    "Learning Distribution": "Learning Distribution",
 
     // settings
     "Use Server": "Use Server",
@@ -91,12 +97,15 @@ export default {
     "Native": "Native",
     "Foreign": "Foreign",
     "Chinese": "Chinese",
+    "Traditional Chinese": "Traditional Chinese",
     "English": "English",
     "Japanese": "Japanese",
     "Korean": "Korean",
     "French": "French",
     "Deutsch": "Deutsch",
     "Spanish": "Spanish",
+    "Only applies to English": "Only applies to English",
+    "CSV files are stored under this vault folder": "CSV files are stored under this vault folder",
 
     "Translate": "Translate",
     "Translate Select": "Translate Select",
@@ -112,7 +121,6 @@ export default {
     "Dictionaries": "Dictionaries",
     "Youdao": "Youdao",
     "Cambridge": "Cambridge",
-    "Jukuu": "Jukuu",
     "Hujiang": "Hujiang",
 
     "Word Database Path": "Word Database Path",

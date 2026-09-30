@@ -1,18 +1,16 @@
 import { requestUrl, RequestUrlParam } from "obsidian"
+import { detectWordLang, getLang } from "@/langs"
 
-const langMap: Record<string, string> = {
-    zh: "ZH",
-    en: "EN",
-    jp: "JA",
-    fr: "FR",
-    de: "DE",
-    es: "ES",
-};
+export async function search(
+    text: string,
+    native: string = "zh",
+    foreign: string = "en"
+): Promise<string | undefined> {
+    // 母语词 → 译成外语；外语词 → 译成母语
+    const direction = detectWordLang(text, native, foreign);
+    const targetLang = direction === "native" ? getLang(foreign) : getLang(native);
+    const target = targetLang?.deepl || "ZH";
 
-export async function search(text: string, lang: string = ""): Promise<string | undefined> {
-    const target = (/[\u4e00-\u9fa5]/.test(text) && !/[\u0800-\u4e00]/.test(text)) // chinese
-        ? langMap[lang] || "ZH"
-        : "ZH";
     const payload = {
         text,
         source_lang: "auto",
@@ -20,7 +18,7 @@ export async function search(text: string, lang: string = ""): Promise<string | 
     };
 
     const data: RequestUrlParam = {
-        url: "https://deeplx.vercel.app/translate",
+        url: "https://deeplx.1stg.me/translate",
         method: "POST",
         body: JSON.stringify(payload),
         contentType: "application/json"

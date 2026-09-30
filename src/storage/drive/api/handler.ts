@@ -124,9 +124,9 @@ export class ApiStorageDrive extends StorageDrive {
     // 通过status查询单词/词组,获取简略信息
     async getAllExpressionSimple(
         ignores?: boolean,
-        sort?:SortParams,
-        search?: {[key: string]: never},
-        paginate?: Paginate
+        _sort?:SortParams,
+        _search?: {[key: string]: never},
+        _paginate?: Paginate
     ): Promise<PaginateResult<ExpressionInfoSimple[]>> {
         let mode = ignores ? "all" : "no_ignore";
 
@@ -261,10 +261,11 @@ export class ApiStorageDrive extends StorageDrive {
             let res = await requestUrl(request);
             return res.json;
         } catch (e) {
+            console.log(e);
         }
     }
 
-    async importDB(data: any, format: 'json' | 'csv' | 'sqlite3') {
+    async importDB(_data: any, _format: 'json' | 'csv' | 'sqlite3') {
     }
 
     async exportDB() {
@@ -274,7 +275,7 @@ export class ApiStorageDrive extends StorageDrive {
         // 什么也没有发生
     }
 
-    removeExpression(id: string | number): Promise<boolean> {
+    removeExpression(_id: string | number): Promise<boolean> {
         return Promise.resolve(false);
     }
 

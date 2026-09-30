@@ -70,9 +70,9 @@ export class IndexedStorageDrive extends StorageDrive {
             return null;
         }
 
-        const sentences = await this.idb.sentences
-            .where("id").anyOf(expr.sentences)
-            .toArray();
+        const sentences = (await this.idb.sentences
+            .bulkGet((expr.sentences as number[]) || [])
+        ).filter(Boolean);
 
         return {
             expression: expr.expression,
@@ -119,9 +119,9 @@ export class IndexedStorageDrive extends StorageDrive {
 
         const res: ReviewWord[] = [];
         for (const expr of wordsAfter) {
-            const sentences = await this.idb.sentences
-                .where("id").anyOf(expr.sentences)
-                .toArray();
+            const sentences = (await this.idb.sentences
+                .bulkGet((expr.sentences as number[]) || [])
+            ).filter(Boolean);
 
             for (const item of sentences) {
                 res.push({
@@ -182,6 +182,9 @@ export class IndexedStorageDrive extends StorageDrive {
                 }
                 if (search.t && match) {
                     match = match && expr.t === search.t;
+                }
+                if (search.tags && Array.isArray(search.tags) && search.tags.length && match) {
+                    match = match && expr.tags.some(tag => search.tags.includes(tag));
                 }
 
                 return match;
@@ -366,37 +369,54 @@ export class IndexedStorageDrive extends StorageDrive {
     }
 
     async postIgnoreWords(payload: string[]): Promise<void> {
+        // 已存在的单词仅置 status=0，保留释义/笔记/标签；不存在的才新建忽略记录
+        await this.idb.transaction("rw", this.idb.expressions, async () => {
+            for (const raw of payload) {
+                const expression = raw.trim().toLowerCase();
+                if (!expression) continue;
 
-        await this.idb.expressions.bulkPut(
-            payload.map(expr => {
-                return {
-                    expression: expr,
-                    meaning: "",
-                    status: 0,
-                    t: WordType.WORD,
-                    notes: [],
-                    sentences: [],
-                    tags: [],
-                    connections: [],
-                    date: moment().unix()
-                } as ExpressionsTable;
-            })
-        );
+                const existing = await this.idb.expressions
+                    .where("expression").equals(expression)
+                    .first();
+
+                if (existing) {
+                    await this.idb.expressions.update(existing._id as number, {
+                        status: 0,
+                        date: moment().unix(),
+                    });
+                } else {
+                    await this.idb.expressions.add({
+                        expression,
+                        meaning: "",
+                        status: 0,
+                        t: WordType.WORD,
+                        notes: [],
+                        sentences: [],
+                        tags: [],
+                        connections: [],
+                        date: moment().unix()
+                    } as ExpressionsTable);
+                }
+            }
+        });
         return;
     }
 
     async tryGetSen(text: string): Promise<Sentence> {
-        const stored = await this.idb.sentences.where("text").equals(text).first();
-        return stored;
+        const stored = await this.idb.sentences.where("sentence").equals(text).first();
+        return stored || null;
     }
 
     async getCount(): Promise<CountInfo> {
         const counts: { "WORD": number[], "PHRASE": number[]; } = {
-            "WORD": new Array(5).fill(0),
-            "PHRASE": new Array(5).fill(0),
+            "WORD":  [0, 0, 0, 0, 0],
+            "PHRASE": [0, 0, 0, 0, 0],
         };
         await this.idb.expressions.each(expr => {
-            counts[expr.t as WordType][expr.status]++;
+            const bucket = counts[expr.t as WordType];
+            if (bucket && expr.status >= 0 && expr.status <= 4) {
+                bucket[expr.status]++;
+            }
         });
 
         return {
@@ -420,22 +440,24 @@ export class IndexedStorageDrive extends StorageDrive {
         // 对每一天计算
         for (const span of spans) {
             // 当日
-            const today = new Array(5).fill(0);
-            await this.idb.expressions.filter(expr => {
-                return expr.t == WordType.WORD &&
-                    expr.date >= span.from &&
-                    expr.date <= span.to;
-            }).each(expr => {
-                today[expr.status]++;
-            });
-            // 累计
-            const accumulated = new Array(5).fill(0);
-            await this.idb.expressions.filter(expr => {
-                return expr.t == WordType.WORD &&
-                    expr.date <= span.to;
-            }).each(expr => {
-                accumulated[expr.status]++;
-            });
+            const today = [0, 0, 0, 0, 0];
+        await this.idb.expressions.filter(expr => {
+            return expr.t == WordType.WORD &&
+                expr.date >= span.from &&
+                expr.date <= span.to &&
+                expr.status >= 0 && expr.status <= 4;
+        }).each(expr => {
+            today[expr.status]++;
+        });
+        // 累计
+        const accumulated = [0, 0, 0, 0, 0];
+        await this.idb.expressions.filter(expr => {
+            return expr.t == WordType.WORD &&
+                expr.date <= span.to &&
+                expr.status >= 0 && expr.status <= 4;
+        }).each(expr => {
+            accumulated[expr.status]++;
+        });
 
             res.push({today, accumulated});
         }
@@ -469,12 +491,14 @@ export class IndexedStorageDrive extends StorageDrive {
         try {
             download(blob, `${this.idb.storageName}.json`, "application/json");
         } catch (e) {
-            console.error("error exporting database");
+            console.error("error exporting database", e);
         }
     }
 
     async destroyAll() {
-        return this.idb.delete();
+        await this.idb.delete();
+        // 重新打开，保证实例销毁后仍可继续使用（空库）
+        await this.idb.open();
     }
 
     async removeExpression(expression: string): Promise<boolean> {

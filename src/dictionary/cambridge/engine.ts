@@ -1,4 +1,5 @@
 import { fetchDirtyDOM } from '../helpers';
+import { getLang } from '@/langs';
 // import { getStaticSpeaker } from '@/components/Speaker'
 import {
     HTMLString,
@@ -16,30 +17,11 @@ import {
     //   getChsToChz
 } from '../helpers';
 
-export const getSrcPage: GetSrcPageFunction = (text) => {
-    //   let { lang } = profile.dicts.all.cambridge.options
-    const langDict: { [K in string]: string } = {
-        "en": "en",
-        "zh": "en-chs",
-        "zh-TW": "en-chz",
-    };
-    let language = window.localStorage.getItem("language");
-    let lang = langDict[language] || "en";
-    //   if (lang === 'default') {
-    //     switch (config.langCode) {
-    //       case 'zh-CN':
-    //         lang = 'en-chs'
-    //         break
-    //       case 'zh-TW':
-    //         lang = 'en-chz'
-    //         break
-    //       default:
-    //         lang = 'en'
-    //         break
-    //     }
-    //   }
+export const getSrcPage: GetSrcPageFunction = (text, native: string = "zh") => {
+    // Cambridge 词典变体跟随插件配置的母语，而不是 Obsidian 界面语言
+    const variant = getLang(native)?.cambridge || "en";
 
-    switch (lang) {
+    switch (variant) {
         case 'en':
             return (
                 'https://dictionary.cambridge.org/search/direct/?datasetsearch=english&q=' +
@@ -56,11 +38,9 @@ export const getSrcPage: GetSrcPageFunction = (text) => {
                 encodeURIComponent(text)
             );
         case 'en-chz': {
-            //   const chsToChz = await getChsToChz()
             return (
                 'https://dictionary.cambridge.org/zht/%E6%90%9C%E7%B4%A2/direct/?datasetsearch=english-chinese-traditional&q=' +
                 encodeURIComponent(text)
-                // encodeURIComponent(chsToChz(text))
             );
         }
     }
@@ -79,8 +59,10 @@ type CambridgeSearchResult = DictSearchResult<CambridgeResult>;
 
 export const search: SearchFunction<CambridgeResult> = async (
     text,
+    config
 ) => {
-    return fetchDirtyDOM(await getSrcPage(text))
+    const native = config?.native || "zh";
+    return fetchDirtyDOM(await getSrcPage(text, native))
         .catch(handleNetWorkError)
         .then(doc => handleDOM(doc))
         .catch(handleNoResult);

@@ -50,12 +50,17 @@ export class Sqlite3StorageDrive extends StorageDrive {
     sqlJs: SqlJsStatic = null;
     storageDrive: Database = null;
 
+    /** 延迟持久化定时器：合并短时间内的多次写入，close 时强制落盘 */
+    private persistTimer: ReturnType<typeof setTimeout> | null = null;
+    private pendingPersist = false;
+
     constructor(plugin: Plugin) {
         super();
         this.plugin = plugin;
         this.storageName = plugin.settings.storage.storage_name;
-        this.storageDir =
-            plugin.settings.storage.drive["sqlite3"].storage_dir || "storage";
+        // 设置页写入的是 storage_path；storage_dir 为历史遗留字段，做兜底
+        const driveConf = plugin.settings.storage.drive["sqlite3"] || {};
+        this.storageDir = driveConf.storage_path || driveConf.storage_dir || "storage";
 
         console.log("SQLite3 存储驱动初始化:");
         console.log("- storageDir:", this.storageDir);
@@ -263,7 +268,37 @@ export class Sqlite3StorageDrive extends StorageDrive {
             CREATE INDEX IF NOT EXISTS "connection_expression_index" ON "connections" ("expression" );
         `);
 
+        this.migrateDateColumns();
+
         this.exportDbToFile();
+    }
+
+    /**
+     * 历史版本把 date 存为 'YYYY-MM-DD HH:mm:ss' 文本，而所有时间比较都用 UNIX 秒，
+     * SQLite 类型序中 TEXT 恒大于 INTEGER，导致统计/复习查询结果恒为空。
+     * 此处一次性把 TEXT 日期迁移为 UNIX 秒（幂等：仅当存在文本日期时执行）。
+     */
+    private migrateDateColumns(): void {
+        const tables = [
+            Tables.EXPRESSION,
+            Tables.SENTENCE,
+            Tables.TAGS,
+            Tables.NOTES,
+            Tables.CONNECTIONS,
+        ];
+        for (const table of tables) {
+            const check = this.storageDrive.exec(
+                `SELECT COUNT(_id) FROM ${table} WHERE typeof(date) = 'text'`
+            );
+            const textCount =
+                check.length > 0 ? Number(check[0].values[0][0] || 0) : 0;
+            if (textCount > 0) {
+                this.storageDrive.exec(
+                    `UPDATE ${table} SET date = CAST(strftime('%s', date) AS INTEGER) WHERE typeof(date) = 'text'`
+                );
+                console.log(`[SQLite] migrated ${textCount} text dates in ${table}`);
+            }
+        }
     }
 
     async open(): Promise<void> {
@@ -280,8 +315,35 @@ export class Sqlite3StorageDrive extends StorageDrive {
     }
 
     close(): void {
+        this.flushPersist();
         this.storageDrive?.close();
         this.sqlJs = null;
+    }
+
+    /** 合并短时间内的频繁写入后统一落盘（默认 1.5s 去抖） */
+    private schedulePersist(delayMs = 1500): void {
+        this.pendingPersist = true;
+        if (this.persistTimer !== null) {
+            clearTimeout(this.persistTimer);
+        }
+        this.persistTimer = setTimeout(() => {
+            this.persistTimer = null;
+            this.pendingPersist = false;
+            this.exportDbToFile();
+        }, delayMs);
+    }
+
+    /** 立即落盘（仅当存在未刷新的延迟写入） */
+    private flushPersist(): void {
+        if (this.persistTimer !== null) {
+            clearTimeout(this.persistTimer);
+            this.persistTimer = null;
+        }
+        if (!this.pendingPersist) {
+            return;
+        }
+        this.pendingPersist = false;
+        this.exportDbToFile();
     }
 
     async exportDbToFile() {
@@ -381,7 +443,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
         // 对每一天计算
         for (const span of spans) {
             // 当日
-            const today = new Array(5).fill(0);
+            const today = [0, 0, 0, 0, 0];
 
             const todayResult = this.storageDrive.exec(
                 "select * from " +
@@ -395,12 +457,14 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     expressionsTableTransform
                 );
                 expression.forEach((expr) => {
-                    today[expr.status]++;
+                    if (expr.status >= 0 && expr.status <= 4) {
+                        today[expr.status]++;
+                    }
                 });
             }
 
             // 累计
-            const accumulated = new Array(5).fill(0);
+            const accumulated = [0, 0, 0, 0, 0];
             const accumulatedResult = this.storageDrive.exec(
                 "select * from " +
                     Tables.EXPRESSION +
@@ -413,7 +477,9 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     expressionsTableTransform
                 );
                 expression.forEach((expr) => {
-                    accumulated[expr.status]++;
+                    if (expr.status >= 0 && expr.status <= 4) {
+                        accumulated[expr.status]++;
+                    }
                 });
             }
 
@@ -432,8 +498,9 @@ export class Sqlite3StorageDrive extends StorageDrive {
             DROP TABLE IF EXISTS "connections";
         `);
 
-        this.exportDbToFile();
-        return null;
+        // 重建空表并落盘，保证销毁后驱动仍可直接使用
+        this.createDbTables();
+        return Promise.resolve();
     }
 
     async exportDB() {
@@ -456,8 +523,8 @@ export class Sqlite3StorageDrive extends StorageDrive {
         const pageSize = paginate?.pageSize || 100;
         const page = paginate?.page || 0; // 接收 0-based 页码
 
-        // 构建 WHERE 子句
-        const whereConditions: string[] = ["status >= ?"];
+        // 构建 WHERE 子句（ignores=false 时排除 status=0 的已忽略词）
+        const whereConditions: string[] = ["status > ?"];
         const whereParams: any[] = [bottomStatus];
 
         // 处理搜索条件（模糊搜索）
@@ -541,30 +608,31 @@ export class Sqlite3StorageDrive extends StorageDrive {
             expressionsTableTransform
         );
 
-        // 批量查询所有 expression 的 tags
+        // 批量查询所有 expression 的 tags（空页时跳过，避免 IN () 语法错误）
         const expressionsList = exprs.map((e) => e.expression);
-        const allTagsResult = this.storageDrive.exec(
-            "select * from " +
-                Tables.TAGS +
-                " INDEXED BY tag_expression_index where expression in (" +
-                expressionsList.map(() => "?").join(",") +
-                ")",
-            expressionsList
-        );
-
-        // 构建 expression -> tags 的映射
         const tagsMap = new Map<string, string[]>();
-        if (allTagsResult.length > 0) {
-            const tags = mapSqlResultToTypedArray<TagsTable>(
-                allTagsResult[0],
-                tagsTableTransform
+        if (expressionsList.length > 0) {
+            const allTagsResult = this.storageDrive.exec(
+                "select * from " +
+                    Tables.TAGS +
+                    " INDEXED BY tag_expression_index where expression in (" +
+                    expressionsList.map(() => "?").join(",") +
+                    ")",
+                expressionsList
             );
-            tags.forEach((tag) => {
-                if (!tagsMap.has(tag.expression)) {
-                    tagsMap.set(tag.expression, []);
-                }
-                tagsMap.get(tag.expression).push(tag.tag);
-            });
+
+            if (allTagsResult.length > 0) {
+                const tags = mapSqlResultToTypedArray<TagsTable>(
+                    allTagsResult[0],
+                    tagsTableTransform
+                );
+                tags.forEach((tag) => {
+                    if (!tagsMap.has(tag.expression)) {
+                        tagsMap.set(tag.expression, []);
+                    }
+                    tagsMap.get(tag.expression).push(tag.tag);
+                });
+            }
         }
 
         // 批量查询所有 expression 的 note 数量
@@ -637,8 +705,8 @@ export class Sqlite3StorageDrive extends StorageDrive {
 
     async getCount(): Promise<CountInfo> {
         const counts: { WORD: number[]; PHRASE: number[] } = {
-            WORD: new Array(5).fill(0),
-            PHRASE: new Array(5).fill(0),
+            WORD: [0, 0, 0, 0, 0],
+            PHRASE: [0, 0, 0, 0, 0],
         };
 
         const exprsResult = this.storageDrive.exec(
@@ -650,7 +718,10 @@ export class Sqlite3StorageDrive extends StorageDrive {
                 expressionsTableTransform
             );
             expression.forEach((expr) => {
-                counts[expr.t as WordType][expr.status]++;
+                const bucket = counts[expr.t as WordType];
+                if (bucket && expr.status >= 0 && expr.status <= 4) {
+                    bucket[expr.status]++;
+                }
             });
         }
 
@@ -753,7 +824,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
         const expressionResult = this.storageDrive.exec(
             "select * from " +
                 Tables.EXPRESSION +
-                " INDEXED BY status_index where status > 0 date > ? order by date asc",
+                " INDEXED BY status_index where status > 0 and date > ? order by date asc",
             [unixStamp]
         );
         if (expressionResult.length <= 0) {
@@ -773,10 +844,12 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     " INDEXED BY sentence_expression_index where expression = ?",
                 [expr.expression]
             );
-            const sentences = mapSqlResultToTypedArray<SentencesTable>(
-                sentencesResult[0],
-                sentencesTableTransform
-            );
+            const sentences = sentencesResult.length > 0
+                ? mapSqlResultToTypedArray<SentencesTable>(
+                      sentencesResult[0],
+                      sentencesTableTransform
+                  )
+                : [];
 
             sentences.forEach((sentence) => {
                 res.push({
@@ -800,10 +873,12 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     " INDEXED BY note_expression_index where expression = ?",
                 [expr.expression]
             );
-            const notes = mapSqlResultToTypedArray<NotesTable>(
-                notesResult[0],
-                notesTableTransform
-            );
+            const notes = notesResult.length > 0
+                ? mapSqlResultToTypedArray<NotesTable>(
+                      notesResult[0],
+                      notesTableTransform
+                  )
+                : [];
 
             const tagsResult = this.storageDrive.exec(
                 "select * from " +
@@ -811,10 +886,12 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     " INDEXED BY tag_expression_index where expression = ?",
                 [expr.expression]
             );
-            const tags = mapSqlResultToTypedArray<TagsTable>(
-                tagsResult[0],
-                tagsTableTransform
-            );
+            const tags = tagsResult.length > 0
+                ? mapSqlResultToTypedArray<TagsTable>(
+                      tagsResult[0],
+                      tagsTableTransform
+                  )
+                : [];
 
             res.push({
                 title: expr.expression,
@@ -840,7 +917,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
             "select * from " +
                 Tables.EXPRESSION +
                 " INDEXED BY expression_index where expression in (" +
-                expressions.map((e) => "?").join(",") +
+                expressions.map(() => "?").join(",") +
                 ")",
             expressions
         );
@@ -862,15 +939,19 @@ export class Sqlite3StorageDrive extends StorageDrive {
                         : 0;
 
                 const tagsResult = this.storageDrive.exec(
-                    "select count(_id) from " +
+                    "select tag from " +
                         Tables.TAGS +
                         " INDEXED BY tag_expression_index where expression = ?",
                     [v.expression]
                 );
-                const tags = mapSqlResultToTypedArray<TagsTable>(
-                    tagsResult[0],
-                    tagsTableTransform
-                );
+                const tags: string[] = [];
+                if (tagsResult.length > 0) {
+                    tagsResult[0].values.forEach((row: any[]) => {
+                        if (row[0] !== null && row[0] !== undefined) {
+                            tags.push(String(row[0]));
+                        }
+                    });
+                }
 
                 const notesResult = this.storageDrive.exec(
                     "select count(_id) from " +
@@ -888,7 +969,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
                     meaning: v.meaning,
                     status: v.status,
                     t: v.t,
-                    tags: tags.map((tag) => tag.tag),
+                    tags,
                     sen_num: sentencesCount,
                     note_num: notesCount,
                     date: v.date,
@@ -919,25 +1000,27 @@ export class Sqlite3StorageDrive extends StorageDrive {
         }
 
         const storedWords: Word[] = [];
-        const expressionResult = this.storageDrive.exec(
-            "select * from " +
-                Tables.EXPRESSION +
-                " INDEXED BY t_index where t = 'WORD' and  expression in (" +
-                expressions.map((e) => "?").join(",") +
-                ")",
-            expressions
-        );
-        if (expressionResult.length > 0) {
-            const expressions = mapSqlResultToTypedArray<ExpressionsTable>(
-                expressionResult[0],
-                expressionsTableTransform
+        if (expressions.length > 0) {
+            const expressionResult = this.storageDrive.exec(
+                "select * from " +
+                    Tables.EXPRESSION +
+                    " INDEXED BY t_index where t = 'WORD' and  expression in (" +
+                    expressions.map(() => "?").join(",") +
+                    ")",
+                expressions
             );
-            expressions.forEach((expr) => {
-                storedWords.push({
-                    text: expr.expression,
-                    status: expr.status,
+            if (expressionResult.length > 0) {
+                const matched = mapSqlResultToTypedArray<ExpressionsTable>(
+                    expressionResult[0],
+                    expressionsTableTransform
+                );
+                matched.forEach((expr) => {
+                    storedWords.push({
+                        text: expr.expression,
+                        status: expr.status,
+                    });
                 });
-            });
+            }
         }
 
         const ac = await createAutomaton([...storedPhrases.keys()]);
@@ -1348,7 +1431,11 @@ export class Sqlite3StorageDrive extends StorageDrive {
     }
 
     postExpression(payload: ExpressionInfo): Promise<number> {
-        const date = moment().format("YYYY-MM-DD HH:mm:ss");
+        // 与 IndexedDB 驱动保持一致，date 统一存 UNIX 秒
+        const date = moment().unix();
+
+        // 记录本单词最终保留的句子 id，用于清理不再引用的旧句子
+        const keptSentenceIds = new Set<number>();
 
         for (const sen of payload.sentences) {
             const senExistsResult = this.storageDrive.exec(
@@ -1368,6 +1455,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
                         " set sentence = ?, trans = ?, origin = ?, date = ? where _id = ?",
                     [sen.sentence, sen.trans, sen.origin, date, senId]
                 );
+                keptSentenceIds.add(senId);
             } else {
                 this.storageDrive.exec(
                     "insert into " +
@@ -1375,6 +1463,37 @@ export class Sqlite3StorageDrive extends StorageDrive {
                         " (expression, sentence, trans, origin) values (?, ?, ?, ?)",
                     [payload.expression, sen.sentence, sen.trans, sen.origin]
                 );
+                const idResult = this.storageDrive.exec(
+                    "select last_insert_rowid()"
+                );
+                if (idResult.length > 0) {
+                    keptSentenceIds.add(Number(idResult[0].values[0][0]));
+                }
+            }
+        }
+
+        // 清理不再被引用的旧句子（与 IndexedDB 驱动行为对齐）
+        if (keptSentenceIds.size > 0 || payload.sentences.length === 0) {
+            const existingResult = this.storageDrive.exec(
+                "select _id from " +
+                    Tables.SENTENCE +
+                    " INDEXED BY sentence_expression_index where expression = ?",
+                [payload.expression]
+            );
+            if (existingResult.length > 0) {
+                const staleIds = existingResult[0].values
+                    .map((row: any[]) => Number(row[0]))
+                    .filter((id: number) => !keptSentenceIds.has(id));
+                if (staleIds.length > 0) {
+                    this.storageDrive.exec(
+                        "delete from " +
+                            Tables.SENTENCE +
+                            " where _id in (" +
+                            staleIds.map(() => "?").join(",") +
+                            ")",
+                        staleIds
+                    );
+                }
             }
         }
 
@@ -1499,49 +1618,35 @@ export class Sqlite3StorageDrive extends StorageDrive {
             );
         }
 
-        this.exportDbToFile();
+        this.schedulePersist();
 
         return Promise.resolve(200);
     }
 
     async postIgnoreWords(payload: string[]): Promise<void> {
-        const promises: Promise<void>[] = [];
-        const dataSet = new Set(
-            payload.map((word) => word.trim().toLowerCase())
-        );
-
-        // 去重复后再添加，转义单引号避免 SQL 语法错误
-        const expressions: string[] = [...dataSet].map((word) => {
-            // 将单引号转义为两个单引号（SQL 标准转义方式）
-            const escapedWord = word.replace(/'/g, "''");
-            return `('${escapedWord}', '', 0, '${WordType.WORD}')`;
-        });
-
-        // 触发每批 100 条的添加
-        for (let i = 0; i < expressions.length; i += 100) {
-            promises.push(
-                new Promise((resolve, reject) => {
-                    try {
-                        const batchValues = expressions
-                            .slice(i, i + 100)
-                            .join(",");
-                        this.storageDrive.exec(
-                            `insert into ${Tables.EXPRESSION} (expression, meaning, status, t) values ${batchValues}`
-                        );
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                })
-            );
+        const dataSet = [...new Set(payload.map((word) => word.trim().toLowerCase()))]
+            .filter((word) => word.length > 0);
+        if (dataSet.length === 0) {
+            return;
         }
 
-        // 存储
-        Promise.all(promises).finally(() => {
-            if (promises.length > 0) {
-                this.exportDbToFile();
-            }
-        });
+        // 已存在的单词仅置 status=0 保留原数据；不存在的插入忽略记录。
+        // date 必须随 INSERT 提供：excluded.date 取的是本次插入值，
+        // 省略该列会让 conflict 分支拿到 CURRENT_TIMESTAMP 文本默认值，重新引入 TEXT 日期
+        const now = moment().unix();
+        const placeholders = dataSet.map(() => "(?, ?, ?, ?, ?)").join(",");
+        const params: any[] = [];
+        for (const word of dataSet) {
+            params.push(word, "", 0, WordType.WORD, now);
+        }
+
+        this.storageDrive.exec(
+            `insert into ${Tables.EXPRESSION} (expression, meaning, status, t, date) values ${placeholders} ` +
+            `on conflict(expression) do update set status = 0, date = excluded.date`,
+            params
+        );
+
+        this.schedulePersist();
     }
 
     async removeExpression(expression: string): Promise<boolean> {
@@ -1549,31 +1654,28 @@ export class Sqlite3StorageDrive extends StorageDrive {
             "delete from " + Tables.EXPRESSION + " where expression = ?",
             [expression]
         );
-        const sentenceResult = this.storageDrive.exec(
+        // DELETE 语句不返回行，用受影响行数判断是否真的删除了
+        const deletedRows = this.storageDrive.getRowsModified();
+
+        this.storageDrive.exec(
             "delete from " + Tables.SENTENCE + " where expression = ?",
             [expression]
         );
-        const tagsResult = this.storageDrive.exec(
+        this.storageDrive.exec(
             "delete from " + Tables.TAGS + " where expression = ?",
             [expression]
         );
-        const notesResult = this.storageDrive.exec(
+        this.storageDrive.exec(
             "delete from " + Tables.NOTES + " where expression = ?",
             [expression]
         );
-        const connResult = this.storageDrive.exec(
+        this.storageDrive.exec(
             "delete from " + Tables.CONNECTIONS + " where expression = ?",
             [expression]
         );
 
-        const state =
-            expressionResult.length > 0 &&
-            sentenceResult.length > 0 &&
-            tagsResult.length > 0 &&
-            notesResult.length > 0 &&
-            connResult.length > 0;
-
-        return Promise.resolve(state).finally(() => this.exportDbToFile());
+        this.schedulePersist();
+        return Promise.resolve(expressionResult !== null && deletedRows > 0);
     }
 
     async tryGetSen(text: string): Promise<Sentence> {
