@@ -17,6 +17,7 @@ import {
 import WordDB from "./idb";
 import Plugin from "@/plugin";
 import StorageDrive, {Paginate, PaginateResult, SortParams} from "@/storage/drive";
+import { migrateLegacyIndexedDb } from "./migrate";
 import { toUnixSeconds } from "@/storage/utils";
 import { ExpressionsTable } from "../types";
 
@@ -31,7 +32,39 @@ export class IndexedStorageDrive extends StorageDrive {
     }
 
     async open() {
-        await this.idb.open();
+        try {
+            await this.idb.open();
+        } catch (e) {
+            // 旧版数据库主键是 ++id，与现行 ++_id 不兼容，Dexie 无法原地升级；
+            // 读出旧数据 → 删库 → 重建 → 写回（见 migrate.ts）
+            const err = e as { name?: string; message?: string };
+            if (err?.name !== "UpgradeError" || !/primary key/i.test(err?.message ?? "")) {
+                throw e;
+            }
+            const name = this.plugin.settings.storage.storage_name;
+            console.warn(
+                `[IndexedStorageDrive] legacy "++id" schema detected, rebuilding "${name}" with data migration`
+            );
+            const legacy = await migrateLegacyIndexedDb(name);
+            this.idb.close();
+            this.idb = new WordDB(this.plugin);
+            await this.idb.open();
+            if (legacy && (legacy.expressions.length || legacy.sentences.length)) {
+                await this.idb.transaction(
+                    "rw",
+                    this.idb.expressions,
+                    this.idb.sentences,
+                    async () => {
+                        if (legacy.sentences.length) {
+                            await this.idb.sentences.bulkPut(legacy.sentences);
+                        }
+                        if (legacy.expressions.length) {
+                            await this.idb.expressions.bulkPut(legacy.expressions);
+                        }
+                    }
+                );
+            }
+        }
         return;
     }
 
