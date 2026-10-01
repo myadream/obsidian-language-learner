@@ -46,7 +46,8 @@ export enum Tables {
     SENTENCE = "sentences",
     TAGS = "tags",
     NOTES = "notes",
-    CONNECTIONS = "connections"
+    CONNECTIONS = "connections",
+    SCHEDULE = "schedules"
 }
 
 export type {

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { makeDrive, DriveFixture } from "../setup/drive-factory";
+import initSqlJs from "sql.js";
+import { makeDrive, DriveFixture, MANIFEST_ID } from "../setup/drive-factory";
+import { MemVaultAdapter } from "../setup/mem-adapter";
 import { ExpressionInfo, WordType } from "@/storage/interface";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 import moment from "moment";
 
 function makeExpression(over: Partial<ExpressionInfo> = {}): ExpressionInfo {
@@ -16,6 +19,10 @@ function makeExpression(over: Partial<ExpressionInfo> = {}): ExpressionInfo {
         date: moment().unix(),
         ...over,
     };
+}
+
+function makeSchedule(over: Partial<WordSchedule> = {}): WordSchedule {
+    return { algorithm: "SM-2", due: 1700000000, interval: 10, ease: 250, ...over };
 }
 
 const DRIVES = ["indexed", "sqlite", "csv", "tedb"] as const;
@@ -343,5 +350,102 @@ describe.each(DRIVES)("%s drive contract", (type) => {
         await db.destroyAll();
         const res = await db.getAllExpressionSimple(true, undefined, undefined, { page: 0, pageSize: 10 });
         expect(res.total).toBe(0);
+    });
+
+    // ---- 复习调度（schedules 关联表） ----
+
+    it("schedules: put → get → upsert → getAll round-trip", async () => {
+        const db = fixture.drive;
+        expect(await db.getSchedule("alpha")).toBeUndefined();
+
+        await db.putSchedule("alpha", makeSchedule());
+        expect(await db.getSchedule("alpha")).toEqual(makeSchedule());
+
+        await db.putSchedule("alpha", makeSchedule({ interval: 20 }));
+        expect(await db.getSchedule("alpha")).toEqual(makeSchedule({ interval: 20 }));
+
+        await db.putSchedule("beta", makeSchedule({ interval: 5, ease: undefined }));
+        const all: ReviewScheduleRecord[] = await db.getAllSchedules();
+        expect(all).toHaveLength(2);
+    });
+
+    it("schedules: importSchedules follows driver semantics (indexed rebuild / others merge)", async () => {
+        const db = fixture.drive;
+        await db.putSchedule("a", makeSchedule({ interval: 1 }));
+        await db.putSchedule("c", makeSchedule({ interval: 3 }));
+
+        await db.importSchedules([
+            { expression: "a", schedule: makeSchedule({ interval: 2 }) },
+            { expression: "b", schedule: makeSchedule({ interval: 4, ease: undefined }) },
+        ]);
+
+        expect(await db.getSchedule("a")).toEqual(makeSchedule({ interval: 2 }));
+        expect(await db.getSchedule("b")).toEqual(makeSchedule({ interval: 4, ease: undefined }));
+        if (type === "indexed") {
+            // 清空重建：预置的 c 被删掉
+            expect(await db.getSchedule("c")).toBeUndefined();
+        } else {
+            // 覆盖合并：预置的 c 保留
+            expect(await db.getSchedule("c")).toEqual(makeSchedule({ interval: 3 }));
+        }
+    });
+
+    it("schedules: removeExpression does not cascade to schedules", async () => {
+        const db = fixture.drive;
+        await db.postExpression(makeExpression({ expression: "apple" }));
+        await db.putSchedule("apple", makeSchedule());
+
+        await db.removeExpression("apple");
+        expect(await db.getSchedule("apple")).toEqual(makeSchedule());
+    });
+
+    it("csv: missing schedules.csv is an empty table; put creates the file", async () => {
+        if (type !== "csv") return;
+        const db = fixture.drive;
+        expect(await db.getAllSchedules()).toEqual([]);
+
+        await db.putSchedule("alpha", makeSchedule());
+        await db.close();
+
+        const text = await fixture.adapter.read(`storage/${fixture.storageName}/schedules.csv`);
+        const header = text.split(/\r?\n/)[0].trim();
+        expect(header).toBe("Expression,Schedule");
+    });
+});
+
+describe("sqlite legacy db gains schedules table on open", () => {
+    it("creates schedules table via CREATE TABLE IF NOT EXISTS on a legacy db", async () => {
+        const adapter = new MemVaultAdapter();
+        adapter.provideSqlWasm(MANIFEST_ID);
+        const storageName = `legacy_sched_${Date.now()}`;
+
+        // 手工构造没有 schedules 表的旧库
+        const SQL = await initSqlJs({
+            wasmBinary: adapter.files.get(
+                `.obsidian/plugins/${MANIFEST_ID}/sql-wasm.wasm`
+            ) as unknown as ArrayBuffer,
+        });
+        const old = new SQL.Database();
+        old.run(`
+            CREATE TABLE expressions (
+                 _id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 expression text not null,
+                 meaning text default '',
+                 status INTEGER default 0,
+                 t text default '',
+                 date DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        const bytes = old.export();
+        old.close();
+        await adapter.writeBinary(
+            `storage/${storageName}.sqlite`,
+            bytes as unknown as ArrayBuffer
+        );
+
+        const { drive } = await makeDrive("sqlite", { adapter, storageName });
+        await drive.putSchedule("alpha", makeSchedule());
+        expect(await drive.getSchedule("alpha")).toEqual(makeSchedule());
+        drive.close();
     });
 });

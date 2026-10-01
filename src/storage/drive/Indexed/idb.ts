@@ -1,10 +1,12 @@
 import Dexie from "dexie";
 import Plugin from "@/plugin";
 import { ExpressionsTable, SentencesTable } from "../types";
+import { ReviewScheduleRecord } from "@/review/types";
 
 export default class WordDB extends Dexie {
     expressions: Dexie.Table<ExpressionsTable, number>;
     sentences: Dexie.Table<SentencesTable, number>;
+    schedules: Dexie.Table<ReviewScheduleRecord, string>;
 
     plugin: Plugin;
     storageName: string;
@@ -54,6 +56,12 @@ export default class WordDB extends Dexie {
                     if (row.connections instanceof Set) row.connections = [...row.connections];
                 });
             });
+        // v3 新增复习调度关联表（主表 schema 不变，无行升级）
+        this.version(3).stores({
+            expressions: "++_id, &expression, status, t, date, *tags",
+            sentences: "++_id, sentence, expression, date",
+            schedules: "&expression, due",
+        });
     }
 }
 

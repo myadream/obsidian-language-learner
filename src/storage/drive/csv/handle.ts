@@ -22,6 +22,7 @@ import { moment } from "obsidian";
 import { createAutomaton } from "ac-auto";
 import { parseCsvTable, stringifyCsvTable } from "./csv";
 import { toUnixSeconds } from "@/storage/utils";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 
 interface CsvExpression {
     _id: number;
@@ -62,11 +63,18 @@ interface CsvConnection {
     date: number;
 }
 
+interface CsvSchedule {
+    expression: string;
+    schedule: WordSchedule;
+}
+
 const EXPRESSION_HEADERS = ["_id", "expression", "meaning", "status", "t", "date"];
 const SENTENCE_HEADERS = ["_id", "expression", "sentence", "trans", "origin", "date"];
 const TAG_HEADERS = ["_id", "expression", "tag", "date"];
 const NOTE_HEADERS = ["_id", "expression", "note", "date"];
 const CONNECTION_HEADERS = ["_id", "expression", "connection", "date"];
+// 调度表存整段 JSON：字段可演进（未知 algorithm 值等）免列迁移
+const SCHEDULE_HEADERS = ["Expression", "Schedule"];
 
 /**
  * CSV 存储驱动：把数据库存为 vault 内的一组 CSV 文件（纯文本、可同步、可外部编辑）。
@@ -83,6 +91,7 @@ export class CsvStorageDrive extends StorageDrive {
     tags: CsvTag[] = [];
     notes: CsvNote[] = [];
     connections: CsvConnection[] = [];
+    schedules: CsvSchedule[] = [];
 
     private nextIds: Record<string, number> = {
         expressions: 1,
@@ -157,6 +166,13 @@ export class CsvStorageDrive extends StorageDrive {
                 rows = this.connections;
                 headers = CONNECTION_HEADERS;
                 break;
+            case "schedules":
+                rows = this.schedules.map((r) => ({
+                    Expression: r.expression,
+                    Schedule: JSON.stringify(r.schedule),
+                }));
+                headers = SCHEDULE_HEADERS;
+                break;
         }
 
         try {
@@ -206,12 +222,13 @@ export class CsvStorageDrive extends StorageDrive {
     // ---- 生命周期 ----
 
     async open(): Promise<void> {
-        const [expressions, sentences, tags, notes, connections] = await Promise.all([
+        const [expressions, sentences, tags, notes, connections, scheduleRows] = await Promise.all([
             this.loadTable<Record<string, string>>("expressions"),
             this.loadTable<Record<string, string>>("sentences"),
             this.loadTable<Record<string, string>>("tags"),
             this.loadTable<Record<string, string>>("notes"),
             this.loadTable<Record<string, string>>("connections"),
+            this.loadTable<Record<string, string>>("schedules"),
         ]);
 
         const toNum = (v: string) => {
@@ -253,6 +270,17 @@ export class CsvStorageDrive extends StorageDrive {
             connection: r.connection ?? "",
             date: toNum(r.date),
         }));
+        // Schedule 列为 JSON；损坏行跳过（沿用驱动容错风格）
+        this.schedules = scheduleRows
+            .map((r) => {
+                try {
+                    return { expression: r.Expression ?? "", schedule: JSON.parse(r.Schedule) };
+                } catch (e) {
+                    console.warn(`[CsvStorage] corrupt schedule row for "${r.Expression}", skipped`, e);
+                    return null;
+                }
+            })
+            .filter((r): r is CsvSchedule => r !== null && !!r.schedule?.algorithm);
 
         // 恢复自增 id
         const maxOf = (rows: Array<{ _id: number }>) =>
@@ -268,6 +296,36 @@ export class CsvStorageDrive extends StorageDrive {
 
     close(): Promise<void> {
         return this.flushPersist();
+    }
+
+    // ---- 复习调度（schedules 关联表） ----
+
+    async getSchedule(expression: string): Promise<WordSchedule | undefined> {
+        return this.schedules.find((r) => r.expression === expression)?.schedule;
+    }
+
+    async putSchedule(expression: string, schedule: WordSchedule): Promise<void> {
+        const i = this.schedules.findIndex((r) => r.expression === expression);
+        if (i >= 0) {
+            this.schedules[i] = { expression, schedule };
+        } else {
+            this.schedules.push({ expression, schedule });
+        }
+        this.markDirty("schedules");
+    }
+
+    async getAllSchedules(): Promise<ReviewScheduleRecord[]> {
+        return this.schedules.map((r) => ({ expression: r.expression, schedule: r.schedule }));
+    }
+
+    /** 覆盖合并（与 importData 语义对齐） */
+    async importSchedules(items: ReviewScheduleRecord[]): Promise<void> {
+        const byExpression = new Map(this.schedules.map((r) => [r.expression, r.schedule]));
+        for (const item of items) {
+            byExpression.set(item.expression, item.schedule);
+        }
+        this.schedules = [...byExpression].map(([expression, schedule]) => ({ expression, schedule }));
+        this.markDirty("schedules");
     }
 
     // ---- 查询 ----

@@ -10,6 +10,7 @@ import {
     WordsPhrase
 } from "@/storage/interface";
 import StorageDrive, {Paginate, PaginateResult, SortParams} from "@/storage/drive";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 
 
 export class ApiStorageDrive extends StorageDrive {
@@ -271,6 +272,22 @@ export class ApiStorageDrive extends StorageDrive {
     }
 
     async importData(_items: ExpressionInfo[]): Promise<void> {
+    }
+
+    // ---- 复习调度：读返回空、写静默忽略（与"已停用"一致） ----
+
+    async getSchedule(_expression: string): Promise<WordSchedule | undefined> {
+        return undefined;
+    }
+
+    async putSchedule(_expression: string, _schedule: WordSchedule): Promise<void> {
+    }
+
+    async getAllSchedules(): Promise<ReviewScheduleRecord[]> {
+        return [];
+    }
+
+    async importSchedules(_items: ReviewScheduleRecord[]): Promise<void> {
     }
 
     async destroyAll() {

@@ -2,6 +2,7 @@ import {
     ArticleWords, WordsPhrase, Sentence,
     ExpressionInfo, ExpressionInfoSimple, CountInfo, WordCount, ReviewWord
 } from "./interface";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 
 export interface Paginate {
     pageSize: number, page: number
@@ -53,6 +54,13 @@ abstract class StorageDrive {
     // 合并语义由驱动决定：indexed 为清空重建（完整恢复），csv/sqlite 为按 expression 覆盖合并。
     // date 语义：写入时保留数据自带的时间（ UNIX 秒），仅缺省时才取当前时间
     abstract importData(items: ExpressionInfo[]): Promise<void>;
+    // ---- 复习调度（schedules 关联表，按 expression 关联；无记录 = 新卡） ----
+    abstract getSchedule(expression: string): Promise<WordSchedule | undefined>;
+    // upsert
+    abstract putSchedule(expression: string, schedule: WordSchedule): Promise<void>;
+    abstract getAllSchedules(): Promise<ReviewScheduleRecord[]>;
+    // 语义与 importData 对齐：indexed 清空重建（完整恢复），csv/sqlite/tedb 按 expression 覆盖合并
+    abstract importSchedules(items: ReviewScheduleRecord[]): Promise<void>;
 }
 
 

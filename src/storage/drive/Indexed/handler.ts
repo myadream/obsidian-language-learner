@@ -20,6 +20,7 @@ import StorageDrive, {Paginate, PaginateResult, SortParams} from "@/storage/driv
 import { migrateLegacyIndexedDb } from "./migrate";
 import { toUnixSeconds } from "@/storage/utils";
 import { ExpressionsTable } from "../types";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 
 export class IndexedStorageDrive extends StorageDrive {
     idb: WordDB;
@@ -545,6 +546,31 @@ export class IndexedStorageDrive extends StorageDrive {
                 }
             }
         );
+    }
+
+    // ---- 复习调度（schedules 关联表） ----
+
+    async getSchedule(expression: string): Promise<WordSchedule | undefined> {
+        const row = await this.idb.schedules
+            .where("expression").equals(expression)
+            .first();
+        return row?.schedule;
+    }
+
+    async putSchedule(expression: string, schedule: WordSchedule): Promise<void> {
+        await this.idb.schedules.put({ expression, schedule });
+    }
+
+    async getAllSchedules(): Promise<ReviewScheduleRecord[]> {
+        return this.idb.schedules.toArray();
+    }
+
+    /** 清空重建：与 importData 的完整恢复语义配对（importData 会删库重建，schedules 一并清空） */
+    async importSchedules(items: ReviewScheduleRecord[]): Promise<void> {
+        await this.idb.transaction("rw", this.idb.schedules, async () => {
+            await this.idb.schedules.clear();
+            await this.idb.schedules.bulkPut(items);
+        });
     }
 
     async destroyAll() {

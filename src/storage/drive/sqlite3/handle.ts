@@ -41,6 +41,25 @@ import {
 } from "@/storage/drive/sqlite3/uitils";
 import { toUnixSeconds } from "@/storage/utils";
 import { createAutomaton } from "ac-auto";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
+
+/** SQL 行 → WordSchedule：NULL 列 → undefined */
+function rowToSchedule(r: Record<string, any>): WordSchedule {
+    const num = (v: any): number | undefined =>
+        v === null || v === undefined ? undefined : Number(v);
+    return {
+        algorithm: r.algorithm as WordSchedule["algorithm"],
+        due: Number(r.due),
+        interval: Number(r.interval),
+        ease: num(r.ease),
+        stability: num(r.stability),
+        difficulty: num(r.difficulty),
+        state: num(r.state),
+        reps: num(r.reps),
+        lapses: num(r.lapses),
+        lastReview: num(r.last_review),
+    };
+}
 
 export class Sqlite3StorageDrive extends StorageDrive {
     plugin: Plugin;
@@ -228,6 +247,20 @@ export class Sqlite3StorageDrive extends StorageDrive {
             );
 
             CREATE INDEX IF NOT EXISTS "connection_expression_index" ON "connections" ("expression" );
+
+            CREATE TABLE IF NOT EXISTS schedules (
+                expression TEXT PRIMARY KEY,
+                algorithm TEXT NOT NULL,
+                due INTEGER NOT NULL,
+                interval REAL NOT NULL,
+                ease REAL,
+                stability REAL,
+                difficulty REAL,
+                state INTEGER,
+                reps INTEGER,
+                lapses INTEGER,
+                last_review INTEGER
+            );
         `);
 
         this.migrateDateColumns();
@@ -459,6 +492,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
             DROP TABLE IF EXISTS "notes";
             DROP TABLE IF EXISTS "sentences";
             DROP TABLE IF EXISTS "connections";
+            DROP TABLE IF EXISTS "schedules";
         `);
 
         // 重建空表并落盘，保证销毁后驱动仍可直接使用
@@ -1253,6 +1287,57 @@ export class Sqlite3StorageDrive extends StorageDrive {
         );
 
         this.schedulePersist();
+    }
+
+    // ---- 复习调度（schedules 关联表） ----
+
+    async getSchedule(expression: string): Promise<WordSchedule | undefined> {
+        const result = this.storageDrive.exec(
+            "select * from " + Tables.SCHEDULE + " where expression = ?",
+            [expression]
+        );
+        if (result.length === 0) {
+            return undefined;
+        }
+        const row = mapSqlResultToTypedObject<Record<string, any>>(result[0]);
+        return row ? rowToSchedule(row) : undefined;
+    }
+
+    async putSchedule(expression: string, schedule: WordSchedule): Promise<void> {
+        this.storageDrive.exec(
+            `insert into ${Tables.SCHEDULE} ` +
+            `(expression, algorithm, due, interval, ease, stability, difficulty, state, reps, lapses, last_review) ` +
+            `values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
+            `on conflict(expression) do update set ` +
+            `algorithm = excluded.algorithm, due = excluded.due, interval = excluded.interval, ` +
+            `ease = excluded.ease, stability = excluded.stability, difficulty = excluded.difficulty, ` +
+            `state = excluded.state, reps = excluded.reps, lapses = excluded.lapses, last_review = excluded.last_review`,
+            [
+                expression, schedule.algorithm, schedule.due, schedule.interval,
+                schedule.ease ?? null, schedule.stability ?? null, schedule.difficulty ?? null,
+                schedule.state ?? null, schedule.reps ?? null, schedule.lapses ?? null,
+                schedule.lastReview ?? null,
+            ]
+        );
+        this.schedulePersist();
+    }
+
+    async getAllSchedules(): Promise<ReviewScheduleRecord[]> {
+        const result = this.storageDrive.exec("select * from " + Tables.SCHEDULE);
+        if (result.length === 0) {
+            return [];
+        }
+        return mapSqlResultToTypedArray<Record<string, any>>(result[0]).map((r) => ({
+            expression: String(r.expression),
+            schedule: rowToSchedule(r),
+        }));
+    }
+
+    /** 覆盖合并（与 importData 语义对齐） */
+    async importSchedules(items: ReviewScheduleRecord[]): Promise<void> {
+        for (const item of items) {
+            await this.putSchedule(item.expression, item.schedule);
+        }
     }
 
     async removeExpression(expression: string): Promise<boolean> {

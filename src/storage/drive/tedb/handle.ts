@@ -18,6 +18,7 @@ import {
 } from "@/storage/interface";
 
 import Plugin from "@/plugin";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 import { moment, Platform } from "obsidian";
 import { createAutomaton } from "ac-auto";
 import { toUnixSeconds } from "@/storage/utils";
@@ -85,6 +86,7 @@ const TABLES = [
     "tags",
     "notes",
     "connections",
+    "schedules",
 ] as const;
 
 type TableName = (typeof TABLES)[number];
@@ -106,6 +108,7 @@ export class TedbStorageDrive extends StorageDrive {
     tags: TedbTag[] = [];
     notes: TedbNote[] = [];
     connections: TedbConnection[] = [];
+    schedules: ReviewScheduleRecord[] = [];
 
     private storages: { [K in TableName]?: ElectronStorage } = {};
     private nextIds: Record<TableName, number> = {
@@ -114,6 +117,7 @@ export class TedbStorageDrive extends StorageDrive {
         tags: 1,
         notes: 1,
         connections: 1,
+        schedules: 1,
     };
 
     constructor(plugin: Plugin) {
@@ -266,11 +270,64 @@ export class TedbStorageDrive extends StorageDrive {
                     date: toNum(r.date),
                 }));
                 break;
+            case "schedules":
+                this.schedules = rows
+                    .filter((r) => typeof r?.expression === "string" && r.schedule?.algorithm)
+                    .map((r) => ({ expression: r.expression, schedule: r.schedule }));
+                break;
         }
     }
 
     close(): void {
         // 写入在每次变更时已按文档即时落盘（await 后才返回），无待刷缓冲
+    }
+
+    // ---- 复习调度（schedules 关联表） ----
+
+    async getSchedule(expression: string): Promise<WordSchedule | undefined> {
+        return this.schedules.find((r) => r.expression === expression)?.schedule;
+    }
+
+    async putSchedule(expression: string, schedule: WordSchedule): Promise<void> {
+        const i = this.schedules.findIndex((r) => r.expression === expression);
+        if (i >= 0) {
+            this.schedules[i] = { expression, schedule };
+        } else {
+            this.schedules.push({ expression, schedule });
+        }
+        await this.storageOf("schedules").setItem(
+            TedbStorageDrive.expressionKey(expression),
+            { expression, schedule }
+        );
+    }
+
+    async getAllSchedules(): Promise<ReviewScheduleRecord[]> {
+        return this.schedules.map((r) => ({ expression: r.expression, schedule: r.schedule }));
+    }
+
+    /** 覆盖合并（与 importData 语义对齐） */
+    async importSchedules(items: ReviewScheduleRecord[]): Promise<void> {
+        const byExpression = new Map(this.schedules.map((r) => [r.expression, r.schedule]));
+        for (const item of items) {
+            byExpression.set(item.expression, item.schedule);
+        }
+
+        const next = [...byExpression].map(([expression, schedule]) => ({ expression, schedule }));
+        const keep = new Set(next.map((r) => r.expression));
+        for (const r of this.schedules) {
+            if (!keep.has(r.expression)) {
+                await this.storageOf("schedules").removeItem(
+                    TedbStorageDrive.expressionKey(r.expression)
+                );
+            }
+        }
+        for (const r of next) {
+            await this.storageOf("schedules").setItem(
+                TedbStorageDrive.expressionKey(r.expression),
+                r
+            );
+        }
+        this.schedules = next;
     }
 
     // ---- 查询（与 CSV 驱动同构，全部走内存） ----
