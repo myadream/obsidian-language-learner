@@ -26,6 +26,13 @@ const RESPONSES: ReviewResponse[] = ["again", "hard", "good", "easy"];
 const LABEL: Record<ReviewResponse, string> = {
     again: "Again", hard: "Hard", good: "Good", easy: "Easy",
 };
+/** 每个难度一个主题色（取自共享主题语义色：红/橙/青绿/绿，明暗自适应） */
+const BUTTON_TYPE: Record<ReviewResponse, "error" | "warning" | "primary" | "success"> = {
+    again: "error",
+    hard: "warning",
+    good: "primary",
+    easy: "success",
+};
 // 键盘快捷键（不在按钮上显示，避免多余数字）
 const HOTKEY: Record<ReviewResponse, string> = {
     again: "1", hard: "2", good: "3", easy: "4",
@@ -274,7 +281,7 @@ function highlight(text: string): string {
                     <NButton
                         v-for="resp in RESPONSES"
                         :key="resp"
-                        :type="resp === 'again' ? 'error' : resp === 'good' ? 'primary' : 'default'"
+                        :type="BUTTON_TYPE[resp]"
                         size="large"
                         @click="rate(resp)"
                     >
