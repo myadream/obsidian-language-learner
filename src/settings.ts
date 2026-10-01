@@ -1,4 +1,4 @@
-import {App, Notice, PluginSettingTab, Setting, debounce} from "obsidian";
+import {App, Modal, Notice, PluginSettingTab, Setting, debounce} from "obsidian";
 
 // import Server from "./api/server";
 import LanguageLearner from "./plugin";
@@ -12,6 +12,72 @@ import store from "./store";
 import { StorageProviderDriveType } from "./storage/provider";
 import { DEFAULT_DRIVE_STORAGE_PATH } from "./storage/settings-normalize";
 import {ExpressionInfoSimple} from "@/storage/interface";
+import { migrateFromSr } from "./review/migrate-from-sr";
+
+/** 从 SR 文件迁移复习进度的确认弹框：可改路径，确认后解析 <!--SR:...--> 回填 schedules */
+class SrMigrateModal extends Modal {
+    constructor(private plugin: LanguageLearner) {
+        super(plugin.app);
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: t("Migrate SR Progress") });
+        contentEl.createEl("p", { text: t("SR migration confirm") });
+
+        const input = contentEl.createEl("input", {
+            type: "text",
+            value: this.plugin.settings.review_database,
+        });
+        input.classList.add("langr-migrate-path-input");
+        input.style.width = "100%";
+
+        const btnRow = contentEl.createDiv();
+        btnRow.style.display = "flex";
+        btnRow.style.justifyContent = "flex-end";
+        btnRow.style.gap = "8px";
+        btnRow.style.marginTop = "12px";
+
+        const cancel = btnRow.createEl("button", { text: t("Cancel") });
+        cancel.onclick = () => this.close();
+
+        const confirm = btnRow.createEl("button", {
+            text: t("Migrate"),
+            cls: "mod-cta",
+        });
+        confirm.onclick = async () => {
+            const path = input.value.trim();
+            if (!path) {
+                this.close();
+                return;
+            }
+            this.plugin.settings.review_database = path;
+            await this.plugin.saveSettings();
+
+            const file = this.plugin.app.vault.getAbstractFileByPath(path);
+            if (!file || "children" in file) {
+                new Notice(t("SR file not found: {0}", path));
+                return;
+            }
+            try {
+                const md = await this.plugin.app.vault.read(file as any);
+                const result = await migrateFromSr(this.plugin.storage.DB(), md);
+                new Notice(t(
+                    "Migrated: {0} matched, {1} skipped, {2} without SR record",
+                    result.matched, result.skipped, result.withoutSchedule,
+                ));
+                this.close();
+            } catch (e) {
+                console.error("[SR migrate] failed", e);
+                new Notice(t("SR migration failed: {0}", String(e)));
+            }
+        };
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+}
 
 export interface MyPluginSettings {
     self_server: boolean;
@@ -37,12 +103,19 @@ export interface MyPluginSettings {
 
     // text db
     word_database: string;
+    // 旧 SR 复习导出文件路径，现在作为"从 SR 文件迁移复习进度"的源
     review_database: string;
     col_delimiter: "," | "\t" | "|";
     auto_refresh_db: boolean;
     // review
     review_prons: "0" | "1";
-    review_delimiter: string;
+    review_algorithm: "FSRS" | "SM-2";
+    review_fsrs_retention: number;
+    review_sm2_base_ease: number;
+    review_sm2_easy_bonus: number;
+    review_sm2_lapse_factor: number;
+    review_maximum_interval: number;
+    review_show_interval: boolean;
 }
 
 export interface StorageSetting {
@@ -143,7 +216,13 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
     word_count: true,
     // review
     review_prons: "0",
-    review_delimiter: "?",
+    review_algorithm: "FSRS",
+    review_fsrs_retention: 0.9,
+    review_sm2_base_ease: 250,
+    review_sm2_easy_bonus: 1.3,
+    review_sm2_lapse_factor: 0.5,
+    review_maximum_interval: 36525,
+    review_show_interval: true,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -597,8 +676,8 @@ export class SettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName(t("Review Database Path"))
-            .setDesc(t("Choose a md file as review database for spaced-repetition"))
+            .setName(t("SR migration source file"))
+            .setDesc(t("SR migration source description"))
             .addText((text) =>
                 text
                     .setValue(this.plugin.settings.review_database)
@@ -717,13 +796,108 @@ export class SettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
             );
+
+        // ---- 复习调度 ----
+
         new Setting(containerEl)
-            .setName(t("Delimiter"))
-            .addText(text => text
-                .setValue(this.plugin.settings.review_delimiter)
-                .onChange(async (value) => {
-                    this.plugin.settings.review_delimiter = value;
+            .setName(t("Scheduling algorithm"))
+            .setDesc(t("Scheduling algorithm description"))
+            .addDropdown(algo => algo
+                .addOption("FSRS", "FSRS")
+                .addOption("SM-2", "SM-2")
+                .setValue(this.plugin.settings.review_algorithm)
+                .onChange(async (value: "FSRS" | "SM-2") => {
+                    this.plugin.settings.review_algorithm = value;
                     await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName(t("FSRS desired retention"))
+            .setDesc(t("FSRS desired retention description"))
+            .addSlider(slider => slider
+                .setLimits(0.5, 1, 0.01)
+                .setValue(this.plugin.settings.review_fsrs_retention)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.review_fsrs_retention = value;
+                    await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName(t("SM-2 base ease"))
+            .setDesc(t("SM-2 base ease description"))
+            .addText(text => text
+                .setValue(String(this.plugin.settings.review_sm2_base_ease))
+                .onChange(debounce(async (value) => {
+                    const n = Number.parseFloat(value);
+                    if (Number.isFinite(n) && n >= 130) {
+                        this.plugin.settings.review_sm2_base_ease = n;
+                        await this.plugin.saveSettings();
+                    }
+                }, 500))
+            );
+
+        new Setting(containerEl)
+            .setName(t("SM-2 easy bonus"))
+            .setDesc(t("SM-2 easy bonus description"))
+            .addText(text => text
+                .setValue(String(this.plugin.settings.review_sm2_easy_bonus))
+                .onChange(debounce(async (value) => {
+                    const n = Number.parseFloat(value);
+                    if (Number.isFinite(n) && n >= 1) {
+                        this.plugin.settings.review_sm2_easy_bonus = n;
+                        await this.plugin.saveSettings();
+                    }
+                }, 500))
+            );
+
+        new Setting(containerEl)
+            .setName(t("SM-2 lapse factor"))
+            .setDesc(t("SM-2 lapse factor description"))
+            .addText(text => text
+                .setValue(String(this.plugin.settings.review_sm2_lapse_factor))
+                .onChange(debounce(async (value) => {
+                    const n = Number.parseFloat(value);
+                    if (Number.isFinite(n) && n > 0 && n <= 1) {
+                        this.plugin.settings.review_sm2_lapse_factor = n;
+                        await this.plugin.saveSettings();
+                    }
+                }, 500))
+            );
+
+        new Setting(containerEl)
+            .setName(t("Maximum interval (days)"))
+            .setDesc(t("Maximum interval description"))
+            .addText(text => text
+                .setValue(String(this.plugin.settings.review_maximum_interval))
+                .onChange(debounce(async (value) => {
+                    const n = Number.parseFloat(value);
+                    if (Number.isFinite(n) && n >= 1) {
+                        this.plugin.settings.review_maximum_interval = n;
+                        await this.plugin.saveSettings();
+                    }
+                }, 500))
+            );
+
+        new Setting(containerEl)
+            .setName(t("Show interval on review buttons"))
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.review_show_interval)
+                .onChange(async (value) => {
+                    this.plugin.settings.review_show_interval = value;
+                    await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName(t("Migrate SR Progress"))
+            .setDesc(t("Migrate SR Progress description"))
+            .addButton(button => button
+                .setButtonText(t("Migrate"))
+                .onClick(() => {
+                    new SrMigrateModal(this.plugin).open();
                 })
             );
     }
