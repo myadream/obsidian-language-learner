@@ -231,30 +231,6 @@ describe.each(DRIVES)("%s drive contract", (type) => {
         expect(today.accumulated[1]).toBeGreaterThanOrEqual(1);
     });
 
-    it("getExpressionAfter returns expressions and their sentences", async () => {
-        const db = fixture.drive;
-        await db.postExpression(
-            makeExpression({
-                expression: "apple",
-                status: 2,
-                sentences: [
-                    { expression: "apple", sentence: "an apple a day", trans: "一天一个苹果", origin: "" },
-                ],
-            })
-        );
-        await db.postExpression(makeExpression({ expression: "ignored", status: 0 }));
-
-        const res = await db.getExpressionAfter("1970-01-01T00:00:00Z");
-        const titles = res.map((r) => r.title);
-        expect(titles).toContain("apple");
-        expect(titles).not.toContain("ignored");
-
-        const sentenceRows = res.filter(
-            (r) => r.title === "apple" && r.expression.includes("==apple==")
-        );
-        expect(sentenceRows.length).toBeGreaterThanOrEqual(1);
-    });
-
     it("getAllExpressionSimple paginates, sorts and filters", async () => {
         const db = fixture.drive;
         // 按时间顺序插入：banana < cherry < apple

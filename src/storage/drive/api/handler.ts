@@ -3,7 +3,7 @@ import {
     ArticleWords,
     CountInfo,
     ExpressionInfo,
-    ExpressionInfoSimple, ReviewWord,
+    ExpressionInfoSimple,
     Sentence,
     Span,
     WordCount,
@@ -104,24 +104,6 @@ export class ApiStorageDrive extends StorageDrive {
 
 
     // 获取某一时间之后的所有单词的详细信息
-    async getExpressionAfter(time: string): Promise<ReviewWord[]> {
-        let unixStamp = moment.utc(time).unix();
-        let request: RequestUrlParam = {
-            url: `${this.proto}://${this.host}:${this.port}/words/after`,
-            method: "POST",
-            body: JSON.stringify(unixStamp),
-            contentType: "application/json",
-            headers: this.baseHeaders,
-        };
-        try {
-            let response = await requestUrl(request);
-            return response.json;
-        } catch (e) {
-            console.warn("Error getting exprs after time from server" + e);
-        }
-    }
-
-
     // 通过status查询单词/词组,获取简略信息
     async getAllExpressionSimple(
         ignores?: boolean,

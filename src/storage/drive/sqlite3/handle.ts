@@ -9,7 +9,6 @@ import {
     ExpressionInfo,
     ExpressionInfoSimple,
     Phrase,
-    ReviewWord,
     Sentence,
     Word,
     WordCount,
@@ -806,95 +805,6 @@ export class Sqlite3StorageDrive extends StorageDrive {
         }
 
         return result;
-    }
-
-    async getExpressionAfter(time: string): Promise<ReviewWord[]> {
-        const unixStamp = moment.utc(time).unix();
-        const expressionResult = this.storageDrive.exec(
-            "select * from " +
-                Tables.EXPRESSION +
-                " INDEXED BY status_index where status > 0 and date > ? order by date asc",
-            [unixStamp]
-        );
-        if (expressionResult.length <= 0) {
-            return [];
-        }
-
-        const expressions = mapSqlResultToTypedArray<ExpressionsTable>(
-            expressionResult[0],
-            expressionsTableTransform
-        );
-
-        const res: ReviewWord[] = [];
-        for (const expr of expressions) {
-            const sentencesResult = this.storageDrive.exec(
-                "select * from " +
-                    Tables.SENTENCE +
-                    " INDEXED BY sentence_expression_index where expression = ?",
-                [expr.expression]
-            );
-            const sentences = sentencesResult.length > 0
-                ? mapSqlResultToTypedArray<SentencesTable>(
-                      sentencesResult[0],
-                      sentencesTableTransform
-                  )
-                : [];
-
-            sentences.forEach((sentence) => {
-                res.push({
-                    title: expr.expression,
-                    expression: sentence.sentence.replace(
-                        expr.expression,
-                        `==${expr.expression}==`
-                    ),
-                    meaning: sentence.trans,
-                    status: expr.status,
-                    t: WordType.PHRASE,
-                    notes: [],
-                    sentences: [],
-                    tags: expr.tags,
-                });
-            });
-
-            const notesResult = this.storageDrive.exec(
-                "select * from " +
-                    Tables.NOTES +
-                    " INDEXED BY note_expression_index where expression = ?",
-                [expr.expression]
-            );
-            const notes = notesResult.length > 0
-                ? mapSqlResultToTypedArray<NotesTable>(
-                      notesResult[0],
-                      notesTableTransform
-                  )
-                : [];
-
-            const tagsResult = this.storageDrive.exec(
-                "select * from " +
-                    Tables.TAGS +
-                    " INDEXED BY tag_expression_index where expression = ?",
-                [expr.expression]
-            );
-            const tags = tagsResult.length > 0
-                ? mapSqlResultToTypedArray<TagsTable>(
-                      tagsResult[0],
-                      tagsTableTransform
-                  )
-                : [];
-
-            res.push({
-                title: expr.expression,
-                expression: expr.expression,
-                meaning: expr.meaning,
-                status: expr.status,
-                t: expr.t,
-                notes: notes.map((note) => note.note),
-                sentences,
-                tags: tags.map((tag) => tag.tag),
-            });
-        }
-
-        return res;
     }
 
     async getExpressionsSimple(

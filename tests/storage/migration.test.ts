@@ -44,9 +44,12 @@ describe("sqlite legacy TEXT-date migration", () => {
         // 打开驱动，应自动迁移
         const { drive } = await makeDrive("sqlite", { adapter, storageName });
 
-        // 迁移后 TEXT 与 UNIX 秒的比较恢复正常
-        const after = await drive.getExpressionAfter("1970-01-01T00:00:00Z");
-        expect(after.map((r) => r.title)).toContain("legacy");
+        // 迁移后 TEXT 与 UNIX 秒的比较恢复正常（经 getAllExpressionSimple 按 date 过滤验证）
+        const after = await drive.getAllExpressionSimple(true);
+        expect(after.data.map((d: any) => d.expression)).toContain("legacy");
+        expect(after.total).toBe(1);
+        const counts = await drive.getCount();
+        expect(counts.word_count[1]).toBe(1);
 
         await drive.countSeven();
         // 2026-01-15 距今不超过 7 天时应在累计里；无论如何迁移后 date 必须是数字

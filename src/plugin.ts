@@ -30,7 +30,7 @@ import type {Position} from "./constant";
 import {InputModal} from "./modals"
 
 import Global from "./views/Global.vue";
-import {ExpressionInfoSimple, WordType} from "@/storage/interface";
+import {ExpressionInfoSimple} from "@/storage/interface";
 import {normalizeStorageSetting} from "@/storage/settings-normalize";
 import { StorageProvider } from "./storage/provider";
 
@@ -88,7 +88,6 @@ export default class LanguageLearner extends Plugin {
         this.registerCustomViews();
         this.registerReadingToggle();
         this.registerContextMenu();
-        this.registerLeftClick();
         this.registerMouseup();
         this.registerEvent(
             this.app.workspace.on("css-change", () => {
@@ -145,13 +144,6 @@ export default class LanguageLearner extends Plugin {
             id: "langr-refresh-word-database",
             name: t("Refresh Word Database"),
             callback: this.refreshWordDb,
-        });
-
-        // 注册刷新复习数据库命令
-        this.addCommand({
-            id: "langr-refresh-review-database",
-            name: t("Refresh Review Database"),
-            callback: this.refreshReviewDb,
         });
 
         // 注册查词命令
@@ -237,7 +229,6 @@ export default class LanguageLearner extends Plugin {
 
     async refreshTextDB() {
         await this.refreshWordDb();
-        await this.refreshReviewDb();
         (this.app as any).commands.executeCommandById(
             "various-complements:reload-custom-dictionaries"
         );
@@ -296,75 +287,6 @@ export default class LanguageLearner extends Plugin {
         const text = word2Meaning + "\n\n" + "#### 反向查询\n" + meaning2Word;
         const db = dataBase as TFile;
         this.app.vault.modify(db, text);
-    };
-
-    refreshReviewDb = async () => {
-        if (!this.settings.review_database) {
-            return;
-        }
-
-        const dataBase = this.app.vault.getAbstractFileByPath(
-            this.settings.review_database
-        );
-        if (!dataBase || "children" in dataBase) {
-            new Notice("Invalid word database path");
-            return;
-        }
-
-        const db = dataBase as TFile;
-        const text = await this.app.vault.read(db);
-        const oldRecord = {} as { [K in string]: string };
-        text.match(/#word(\n.+)+\n(<!--SR.*?-->)/g)
-            ?.map((v) => v.match(/#### (.+)[\s\S]+(<!--SR.*-->)/))
-            ?.forEach((v) => {
-                oldRecord[v[1]] = v[2];
-            });
-
-        // let data = await this.db.getExpressionAfter(this.settings.last_sync)
-        const data = await this.storage.DB().getExpressionAfter("1970-01-01T00:00:00Z");
-        if (data.length === 0) {
-            // new Notice("Nothing new")
-            return;
-        }
-
-        data.sort((a, b) => a.expression.localeCompare(b.expression));
-
-        let newText = data.map((word) => {
-            const notes = word.notes.length === 0
-                ? ""
-                : "**Notes**:\n" + word.notes.join("\n").trim() + "\n";
-            const sentences = word.sentences.length === 0
-                ? ""
-                : "**Sentences**:\n" +
-                word.sentences.map((sen) => {
-                    return (
-                        `*${sen.sentence.trim()}*` + "\n" +
-                        (sen.trans ? sen.trans.trim() + "\n" : "") +
-                        (sen.origin ? sen.origin.trim() : "")
-                    );
-                }).join("\n").trim() + "\n\n";
-
-            let title = `## ${word.title} \n\n`;
-            if (word.t === WordType.PHRASE) {
-               title =  `## ${word.title}\n\n`;
-            }
-
-            return (
-                `#word\n` +
-                title+
-                `${word.expression}\n` +
-                `${this.settings.review_delimiter.repeat(2)}\n` +
-                `${word.meaning}\n\n` +
-                `${notes}` +
-                `${sentences}` +
-                (oldRecord[word.expression] ? oldRecord[word.expression] + "\n" : "")
-            );
-        }).join("\n") + "\n";
-
-        newText = "#flashcards\n\n" + newText;
-        await this.app.vault.modify(db, newText);
-
-        this.saveSettings();
     };
 
     // 在MardownView的扩展菜单加一个转为Reading模式的选项
@@ -529,24 +451,6 @@ export default class LanguageLearner extends Plugin {
                 evt.stopImmediatePropagation();
                 this.queryWord(selection, null, {x: evt.pageX, y: evt.pageY});
                 return;
-            }
-        });
-    }
-
-    // 管理所有的鼠标左击
-    registerLeftClick() {
-        this.registerDomEvent(document.body, "click", (evt) => {
-            const target = evt.target as HTMLElement;
-            if (
-                target.tagName === "H4" &&
-                target.matchParent(".sr-modal-content")
-            ) {
-                const word = target.textContent;
-                speakWord(word, {
-                    native: this.settings.native,
-                    foreign: this.settings.foreign,
-                    accent: this.settings.review_prons,
-                });
             }
         });
     }

@@ -9,7 +9,6 @@ import {
     ExpressionInfo,
     ExpressionInfoSimple,
     Phrase,
-    ReviewWord,
     Sentence,
     Word,
     WordCount,
@@ -398,48 +397,6 @@ export class TedbStorageDrive extends StorageDrive {
                 note_num: this.notes.filter((n) => n.expression === e.expression).length,
                 date: e.date,
             }));
-    }
-
-    async getExpressionAfter(time: string): Promise<ReviewWord[]> {
-        const unixStamp = moment.utc(time).unix();
-        const res: ReviewWord[] = [];
-
-        const after = this.expressions
-            .filter((e) => e.status > 0 && e.date > unixStamp)
-            .sort((a, b) => a.date - b.date);
-
-        for (const expr of after) {
-            const sentences = this.sentences.filter((s) => s.expression === expr.expression);
-
-            for (const sentence of sentences) {
-                res.push({
-                    title: expr.expression,
-                    expression: sentence.sentence.replace(
-                        expr.expression,
-                        `==${expr.expression}==`
-                    ),
-                    meaning: sentence.trans,
-                    status: expr.status,
-                    t: WordType.PHRASE,
-                    notes: [],
-                    sentences: [],
-                    tags: this.tags.filter((t) => t.expression === expr.expression).map((t) => t.tag),
-                });
-            }
-
-            res.push({
-                title: expr.expression,
-                expression: expr.expression,
-                meaning: expr.meaning,
-                status: expr.status,
-                t: expr.t,
-                notes: this.notes.filter((n) => n.expression === expr.expression).map((n) => n.note),
-                sentences: sentences as Sentence[],
-                tags: this.tags.filter((t) => t.expression === expr.expression).map((t) => t.tag),
-            });
-        }
-
-        return res;
     }
 
     private static readonly SORTERS: Record<string, (a: any, b: any) => number> = {

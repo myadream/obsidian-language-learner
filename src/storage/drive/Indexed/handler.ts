@@ -6,7 +6,7 @@ import {
     CountInfo,
     ExpressionInfo,
     ExpressionInfoSimple,
-    Phrase, ReviewWord,
+    Phrase,
     Sentence,
     Span,
     Word,
@@ -141,46 +141,6 @@ export class IndexedStorageDrive extends StorageDrive {
                 date: v.date
             };
         });
-    }
-
-    async getExpressionAfter(time: string): Promise<ReviewWord[]> {
-        const unixStamp = moment.utc(time).unix();
-        const wordsAfter = await this.idb.expressions
-            .where("status").above(0)
-            .and(expr => expr.date > unixStamp)
-            .toArray();
-
-        const res: ReviewWord[] = [];
-        for (const expr of wordsAfter) {
-            const sentences = (await this.idb.sentences
-                .bulkGet((expr.sentences as number[]) || [])
-            ).filter(Boolean);
-
-            for (const item of sentences) {
-                res.push({
-                    title: expr.expression,
-                    expression: item.sentence.replace(expr.expression, `==${expr.expression}==`),
-                    meaning: item.trans,
-                    status: expr.status,
-                    t: WordType.PHRASE,
-                    notes: [],
-                    sentences: [],
-                    tags: expr.tags,
-                });
-            }
-
-            res.push({
-                title: expr.expression,
-                expression: expr.expression,
-                meaning: expr.meaning,
-                status: expr.status,
-                t: expr.t,
-                notes: expr.notes as string[],
-                sentences,
-                tags: expr.tags,
-            });
-        }
-        return res;
     }
 
     async getAllExpressionSimple(
