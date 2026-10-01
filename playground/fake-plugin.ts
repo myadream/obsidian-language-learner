@@ -2,6 +2,7 @@
 // 数据形态对齐 src/storage/interface.ts 的 ExpressionInfo 与 DataPanel 的分页响应。
 import { reactive } from "vue";
 import store from "@/store";
+import { ReviewScheduleRecord, WordSchedule } from "@/review/types";
 
 export interface FakeWord {
     expression: string;
@@ -173,6 +174,17 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
 
     const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
+    // fake schedules 关联表：到期 / 未来 / 新卡三档（其余词均无调度 = 新卡）
+    const sec = (ms: number) => Math.floor(ms / 1000);
+    const schedules = new Map<string, WordSchedule>([
+        ["resilient", {
+            algorithm: "FSRS", due: sec(now - 3600 * 1000), interval: 5,
+            stability: 5, difficulty: 5, state: 2, reps: 3, lapses: 0,
+            learningSteps: 0, lastReview: sec(now - 5 * DAY),
+        }],
+        ["ephemeral", { algorithm: "SM-2", due: sec(now + 7 * DAY), interval: 7, ease: 250 }],
+    ]);
+
     const db = {
         getAllExpressionSimple: async (
             _ignores: boolean,
@@ -233,6 +245,16 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
             words = words.filter((x) => x.expression !== expr);
         },
         tryGetSen: async () => null,
+        // ---- 复习调度（schedules 关联表） ----
+        getSchedule: async (expr: string) => schedules.get(expr),
+        putSchedule: async (expr: string, schedule: WordSchedule) => {
+            schedules.set(expr, schedule);
+        },
+        getAllSchedules: async (): Promise<ReviewScheduleRecord[]> =>
+            [...schedules].map(([expression, schedule]) => ({ expression, schedule })),
+        importSchedules: async (items: ReviewScheduleRecord[]) => {
+            for (const item of items) schedules.set(item.expression, item.schedule);
+        },
     };
 
     const plugin = {
@@ -246,6 +268,15 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
             foreign: "en",
             review_prons: "0" as const,
             function_key: "ctrlKey",
+            // 复习调度设置（对齐 settings.ts 默认值）
+            review_algorithm: "FSRS" as const,
+            review_fsrs_retention: 0.9,
+            review_sm2_base_ease: 250,
+            review_sm2_easy_bonus: 1.3,
+            review_sm2_lapse_factor: 0.5,
+            review_maximum_interval: 36525,
+            review_show_interval: true,
+            review_database: "",
         },
         app: { workspace: {} },
         storage: {

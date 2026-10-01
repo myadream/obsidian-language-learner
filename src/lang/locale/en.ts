@@ -260,7 +260,6 @@ export default {
     "relaxed skips fsync (about 2-3x faster); strict fsyncs every write": "relaxed skips fsync (about 2-3x faster); strict fsyncs every write",
 
     // 复习（内建间隔重复）
-    "Review": "Review",
     "Start Review": "Start Review",
     "Show Answer": "Show Answer",
     "Again": "Again",
@@ -290,7 +289,6 @@ export default {
     "Migrate SR Progress description": "Parse the old SR review file and restore card progress",
     "SR migration confirm": "Parse the md file below and restore review progress for words still in the database. Existing schedules for matched words will be overwritten.",
     "Migrate": "Migrate",
-    "Cancel": "Cancel",
     "SR file not found: {0}": "SR file not found: {0}",
     "SR migration failed: {0}": "SR migration failed: {0}",
     "Migrated: {0} matched, {1} skipped, {2} without SR record": "Migrated: {0} matched, {1} skipped, {2} without SR record"

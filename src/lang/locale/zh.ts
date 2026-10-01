@@ -258,7 +258,6 @@ export default {
     "relaxed skips fsync (about 2-3x faster); strict fsyncs every write": "relaxed 跳过 fsync（约快 2~3 倍）；strict 每次写入都 fsync",
 
     // 复习（内建间隔重复）
-    "Review": "复习",
     "Start Review": "开始复习",
     "Show Answer": "显示答案",
     "Again": "忘记",
@@ -288,7 +287,6 @@ export default {
     "Migrate SR Progress description": "解析旧 SR 复习文件，恢复仍在库中单词的复习进度",
     "SR migration confirm": "解析下方 md 文件并为仍在库中的单词恢复复习进度；命中单词的既有调度将被覆盖。",
     "Migrate": "迁移",
-    "Cancel": "取消",
     "SR file not found: {0}": "找不到 SR 文件：{0}",
     "SR migration failed: {0}": "迁移失败：{0}",
     "Migrated: {0} matched, {1} skipped, {2} without SR record": "迁移完成：匹配 {0} 个，跳过 {1} 个，{2} 个无 SR 记录"

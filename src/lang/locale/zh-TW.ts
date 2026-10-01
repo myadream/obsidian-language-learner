@@ -242,7 +242,6 @@ export default {
     "relaxed skips fsync (about 2-3x faster); strict fsyncs every write": "relaxed 跳過 fsync（約快 2~3 倍）；strict 每次寫入都 fsync",
 
     // 複習（內建間隔重複）
-    "Review": "複習",
     "Start Review": "開始複習",
     "Show Answer": "顯示答案",
     "Again": "忘記",
@@ -272,7 +271,6 @@ export default {
     "Migrate SR Progress description": "解析舊 SR 複習文件，恢復仍在庫中單字的複習進度",
     "SR migration confirm": "解析下方 md 文件並為仍在庫中的單字恢復複習進度；命中單字的既有調度將被覆蓋。",
     "Migrate": "遷移",
-    "Cancel": "取消",
     "SR file not found: {0}": "找不到 SR 文件：{0}",
     "SR migration failed: {0}": "遷移失敗：{0}",
     "Migrated: {0} matched, {1} skipped, {2} without SR record": "遷移完成：匹配 {0} 個，跳過 {1} 個，{2} 個無 SR 記錄"

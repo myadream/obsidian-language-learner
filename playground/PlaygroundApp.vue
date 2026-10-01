@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// DEBUG HARNESS — 场景宿主：完整 DataPanel + 独立挂载的 WordMoreModal 边界场景。
+// DEBUG HARNESS — 场景宿主：完整 DataPanel / ReviewPanel + 独立挂载的 WordMoreModal 边界场景。
 import { ref } from "vue";
 import { NMessageProvider } from "naive-ui";
 import DataPanel from "@/views/DataPanel.vue";
+import ReviewPanel from "@/views/ReviewPanel.vue";
 import WordMoreModal from "@/component/WordMoreModal.vue";
 import store from "@/store";
 
@@ -12,6 +13,8 @@ function toggleDark(v: boolean) {
     store.dark = v;
     document.body.classList.toggle("theme-dark", v);
 }
+
+const view = ref<"data" | "review">("data");
 
 // 独立详情弹框场景：ghostword 不在数据库中 / 空词
 const showMissing = ref(false);
@@ -24,12 +27,15 @@ const emptyWord = "";
     <div class="pg-root">
         <div class="pg-toolbar">
             <span class="pg-title">OLL UI Playground — debug harness</span>
+            <button class="pg-btn" :class="{ 'pg-active': view === 'data' }" @click="view = 'data'">DataPanel</button>
+            <button class="pg-btn" :class="{ 'pg-active': view === 'review' }" @click="view = 'review'">Review</button>
             <label class="pg-opt"><input type="checkbox" :checked="dark" @change="toggleDark(($event.target as HTMLInputElement).checked)" /> dark</label>
             <button class="pg-btn" @click="showMissing = true">Detail: word missing in DB</button>
             <button class="pg-btn" @click="showEmptyWord = true">Detail: empty word string</button>
         </div>
         <div class="pg-panel">
-            <DataPanel />
+            <DataPanel v-if="view === 'data'" />
+            <ReviewPanel v-else />
         </div>
 
         <NMessageProvider>
@@ -86,6 +92,12 @@ body {
     font-size: 12px;
     padding: 3px 8px;
     cursor: pointer;
+}
+.pg-btn.pg-active {
+    font-weight: 700;
+    background: #0d9488;
+    color: #fff;
+    border-color: #0d9488;
 }
 .pg-panel {
     flex: 1;
