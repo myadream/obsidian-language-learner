@@ -207,6 +207,7 @@ export class TedbStorageDrive extends StorageDrive {
             tags: maxOf(this.tags) + 1,
             notes: maxOf(this.notes) + 1,
             connections: maxOf(this.connections) + 1,
+            schedules: 1,
         };
     }
 
@@ -726,6 +727,7 @@ export class TedbStorageDrive extends StorageDrive {
             tags: 1,
             notes: 1,
             connections: 1,
+            schedules: 1,
         };
     }
 

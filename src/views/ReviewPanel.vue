@@ -33,6 +33,7 @@ const HOTKEY: Record<ReviewResponse, string> = {
 };
 
 const state = ref<"loading" | "front" | "back" | "done">("loading");
+const rootEl = ref<HTMLElement | null>(null);
 let queue: ReviewQueueItem[] = [];
 let idx = 0;
 const queueLen = ref(0);
@@ -138,7 +139,31 @@ function speak() {
     });
 }
 
+function isEditable(el: Element | null): boolean {
+    if (!el) return false;
+    const tag = el.tagName;
+    return (
+        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+        (el as HTMLElement).isContentEditable === true
+    );
+}
+
+/**
+ * 面板是否处于可响应快捷键的前台状态：
+ * ItemView 的 leaf 切到后台不会卸载，无守卫会劫持编辑器/弹框里的 Space 与 1-4。
+ */
+function isPanelActive(): boolean {
+    const active = document.activeElement;
+    if (isEditable(active)) return false;
+    const root = rootEl.value;
+    return (
+        active === null || active === document.body ||
+        (root !== null && root.contains(active))
+    );
+}
+
 function onKey(e: KeyboardEvent) {
+    if (!isPanelActive()) return;
     if (e.key === " " && state.value === "front") {
         e.preventDefault();
         showAnswer();
@@ -163,7 +188,7 @@ function highlight(text: string): string {
 </script>
 
 <template>
-    <div class="langr-review">
+    <div ref="rootEl" class="langr-review">
         <NConfigProvider :theme="theme" :theme-overrides="themeConfig">
             <div v-if="state === 'loading'" class="review-state review-loading">
                 {{ t("Review") }}…

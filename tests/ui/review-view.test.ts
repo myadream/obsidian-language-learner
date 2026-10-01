@@ -151,6 +151,26 @@ describe("ReviewPanel", () => {
         expect(banana!.interval).toBe(2.5);
     });
 
+    it("面板不在前台（焦点在外部输入框）时不响应全局快捷键", async () => {
+        await seedTwoWords();
+        const wrapper = mountPanel(makePlugin(fixture.drive));
+        await settle();
+
+        // 模拟用户焦点在别处的输入框（编辑器/弹框输入）
+        const input = document.createElement("input");
+        document.body.appendChild(input);
+        input.focus();
+        try {
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: " " }));
+            await settle();
+            // 仍在正面：Space 未触发显示答案
+            expect(wrapper.text()).toContain("apple");
+            expect(wrapper.text()).not.toContain("苹果");
+        } finally {
+            input.remove();
+        }
+    });
+
     it("调度抛错：该词跳过、会话推进，完成页给出跳过计数", async () => {
         const now = await seedTwoWords();
         const plugin = makePlugin(fixture.drive);

@@ -146,6 +146,39 @@ describe("migrateFromSr", () => {
         });
     });
 
+    it("大小写不一致时按库内大小写回写（否则 join 不到成孤儿）", async () => {
+        // csv 驱动的 getExpression 对混合大小写行也是大小写不敏感命中
+        const csv = await makeDrive("csv");
+        try {
+            await csv.drive.postExpression({
+                expression: "Apple", meaning: "苹果", status: 1, t: WordType.WORD,
+                tags: [], notes: [], sentences: [], connections: [], date: 1700000000,
+            });
+
+            const md = [
+                "#word",
+                "## apple",
+                "",
+                "apple",
+                "??",
+                "苹果",
+                "<!--SR:2024-03-01,12,250-->",
+            ].join("\n");
+
+            const r = await migrateFromSr(csv.drive, md);
+            expect(r.matched).toBe(1);
+            // 库内大小写的键可取到
+            expect(await csv.drive.getSchedule("Apple")).toEqual({
+                algorithm: "SM-2", due: SM2_DUE, interval: 12, ease: 250,
+            });
+            // md 原样大小写不产生孤儿
+            expect(await csv.drive.getSchedule("apple")).toBeUndefined();
+        } finally {
+            csv.drive.close();
+            csv.adapter.dispose();
+        }
+    });
+
     it("全部块无 SR 注释 → matched 0, withoutSchedule 计数", async () => {
         await seedWord("dog");
         const r = await migrateFromSr(fixture.drive, "#word\n## dog\n\ndog\n??\n狗\n");

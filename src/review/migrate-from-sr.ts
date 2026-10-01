@@ -160,7 +160,9 @@ export async function migrateFromSr(drive: StorageDrive, md: string): Promise<Sr
             skipped++;
             continue;
         }
-        await drive.putSchedule(block.expression, block.schedule);
+        // 按库内大小写回写：md 的大小写可能与库不一致，
+        // getSchedule/队列 join 都是精确匹配，原样回写会产生永不命中的孤儿调度
+        await drive.putSchedule(expr.expression, block.schedule);
         matched++;
     }
     return { total: blocks.length, matched, skipped, withoutSchedule };
