@@ -17,6 +17,7 @@ import {READING_ICON, READING_VIEW_TYPE, ReadingView} from "./views/ReadingView"
 import {LEARN_ICON, LEARN_PANEL_VIEW, LearnPanelView} from "./views/LearnPanelView";
 import {STAT_ICON, STAT_VIEW_TYPE, StatView} from "./views/StatView";
 import {DATA_ICON, DATA_PANEL_VIEW, DataPanelView} from "./views/DataPanelView";
+import {REVIEW_ICON, REVIEW_VIEW_TYPE, ReviewView} from "./views/ReviewView";
 
 import {t} from "./lang/helper";
 import {TextParser} from "./views/parser";
@@ -109,6 +110,7 @@ export default class LanguageLearner extends Plugin {
         this.app.workspace.detachLeavesOfType(DATA_PANEL_VIEW);
         this.app.workspace.detachLeavesOfType(STAT_VIEW_TYPE);
         this.app.workspace.detachLeavesOfType(READING_VIEW_TYPE);
+        this.app.workspace.detachLeavesOfType(REVIEW_VIEW_TYPE);
 
         this.storage?.destroyed().catch((e) =>
             console.error("[StorageProvider] flush on unload failed", e)
@@ -144,6 +146,15 @@ export default class LanguageLearner extends Plugin {
             id: "langr-refresh-word-database",
             name: t("Refresh Word Database"),
             callback: this.refreshWordDb,
+        });
+
+        // 注册复习命令
+        this.addCommand({
+            id: "langr-review-open",
+            name: t("Start Review"),
+            callback: () => {
+                this.activateView(REVIEW_VIEW_TYPE, "tab");
+            },
         });
 
         // 注册查词命令
@@ -192,10 +203,16 @@ export default class LanguageLearner extends Plugin {
             (leaf) => new ReadingView(leaf, this)
         );
 
-        //注册统计视图
+        // 注册统计视图
         this.registerView(STAT_VIEW_TYPE, (leaf) => new StatView(leaf, this));
         this.addRibbonIcon(STAT_ICON, t("Open statistics"), async () => {
             this.activateView(STAT_VIEW_TYPE, "right");
+        });
+
+        // 注册复习视图
+        this.registerView(REVIEW_VIEW_TYPE, (leaf) => new ReviewView(leaf, this));
+        this.addRibbonIcon(REVIEW_ICON, t("Start Review"), async () => {
+            this.activateView(REVIEW_VIEW_TYPE, "tab");
         });
 
         //注册单词列表视图
