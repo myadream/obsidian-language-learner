@@ -57,6 +57,7 @@ function rowToSchedule(r: Record<string, any>): WordSchedule {
         state: num(r.state),
         reps: num(r.reps),
         lapses: num(r.lapses),
+        learningSteps: num(r.learning_steps),
         lastReview: num(r.last_review),
     };
 }
@@ -259,6 +260,7 @@ export class Sqlite3StorageDrive extends StorageDrive {
                 state INTEGER,
                 reps INTEGER,
                 lapses INTEGER,
+                learning_steps INTEGER,
                 last_review INTEGER
             );
         `);
@@ -1306,17 +1308,18 @@ export class Sqlite3StorageDrive extends StorageDrive {
     async putSchedule(expression: string, schedule: WordSchedule): Promise<void> {
         this.storageDrive.exec(
             `insert into ${Tables.SCHEDULE} ` +
-            `(expression, algorithm, due, interval, ease, stability, difficulty, state, reps, lapses, last_review) ` +
-            `values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
+            `(expression, algorithm, due, interval, ease, stability, difficulty, state, reps, lapses, learning_steps, last_review) ` +
+            `values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ` +
             `on conflict(expression) do update set ` +
             `algorithm = excluded.algorithm, due = excluded.due, interval = excluded.interval, ` +
             `ease = excluded.ease, stability = excluded.stability, difficulty = excluded.difficulty, ` +
-            `state = excluded.state, reps = excluded.reps, lapses = excluded.lapses, last_review = excluded.last_review`,
+            `state = excluded.state, reps = excluded.reps, lapses = excluded.lapses, ` +
+            `learning_steps = excluded.learning_steps, last_review = excluded.last_review`,
             [
                 expression, schedule.algorithm, schedule.due, schedule.interval,
                 schedule.ease ?? null, schedule.stability ?? null, schedule.difficulty ?? null,
                 schedule.state ?? null, schedule.reps ?? null, schedule.lapses ?? null,
-                schedule.lastReview ?? null,
+                schedule.learningSteps ?? null, schedule.lastReview ?? null,
             ]
         );
         this.schedulePersist();

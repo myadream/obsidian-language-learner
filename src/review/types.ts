@@ -18,6 +18,8 @@ export interface WordSchedule {
     state?: number;
     reps?: number;
     lapses?: number;
+    /** ts-fsrs 学习步数（短期调度用，必须随记录保留，丢失会破坏 Learning→Review 毕业） */
+    learningSteps?: number;
     /** 上次评分时间，UNIX 秒 */
     lastReview?: number;
 }

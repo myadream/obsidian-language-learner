@@ -36,6 +36,7 @@ function toCardInput(s: WordSchedule, now: number): CardInput {
         reps: s.reps ?? 0,
         lapses: s.lapses ?? 0,
         state: (s.state ?? State.New) as State,
+        learning_steps: s.learningSteps ?? 0,
         last_review: s.lastReview !== undefined ? new Date(s.lastReview * 1000) : undefined,
     };
 }
@@ -50,6 +51,7 @@ function toWordSchedule(card: Card, now: number): WordSchedule {
         state: card.state as number,
         reps: card.reps,
         lapses: card.lapses,
+        learningSteps: card.learning_steps,
         lastReview: now,
     };
 }
