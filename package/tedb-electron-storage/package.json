@@ -20,7 +20,8 @@
         "url": "git+https://github.com/fork-organizations/tedb-electron-storage"
     },
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
     },
     "author": "qiyangxy",
     "license": "MIT",
