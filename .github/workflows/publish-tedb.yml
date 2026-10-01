@@ -1,0 +1,51 @@
+name: Publish tedb-electron-storage
+
+# 内嵌包 @qiyangxy/tedb-electron-storage 的 npm 发布：
+# - 推送 tedb-v* 标签触发（如 tedb-v0.6.0）
+# - 或在 Actions 页手动触发（workflow_dispatch）
+# 前置：仓库 Settings → Secrets and variables → Actions 配置 NPM_TOKEN
+#       npmjs.com 上以 @qiyangxy scope 发布权的账号生成 **Granular Access Token**：
+#       权限 Read-write 限定 @qiyangxy/tedb-electron-storage，
+#       2FA 选项选 bypass——账号开了"发布需 2FA"时，classic token / 无 OTP 发布会被 403 拦截
+#       （本地发布同理：npm publish --otp=动态码，或带 bypass token）
+# 发布内容 = 仓库内已提交的 dist/（本包不发 npm，dist 即唯一产物，不重复构建）
+
+on:
+  push:
+    tags:
+      - "tedb-v*"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: package/tedb-electron-storage
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check package version and dist
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Publishing @qiyangxy/tedb-electron-storage@$VERSION"
+          test -f dist/index.js || { echo "dist/index.js missing — commit the built dist first"; exit 1; }
+
+      - name: Publish (skip if version already on npm)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@qiyangxy/tedb-electron-storage@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $VERSION is already published — nothing to do"
+          else
+            npm publish --access public
+          fi
