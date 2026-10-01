@@ -38,7 +38,6 @@
                     <ActionButtons
                         :has-active-filters="hasAnyFilter"
                         @add-word="onAddWord"
-                        @refresh="refresh"
                         @reset-filters="resetFilters"
                         @export="handleExport"
                     />
@@ -464,20 +463,6 @@ const onSortChange = (value: string) => {
     sortParams.value.order = order;
     savePrefs();
     refetchFromFirstPage();
-};
-
-// 兼容文件同步后的数据库未重新打开读取数据问题
-const refresh = async () => {
-    if (loading.value) {
-        return;
-    }
-
-    loading.value = true
-
-    // 重新注册数据库
-    await plugin.storage.reRegister(plugin.settings.storage.storage_type);
-
-    await expressions();
 };
 
 const expressions = async () => {

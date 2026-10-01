@@ -7,7 +7,6 @@ export default {
     "Open statistics": "打开统计",
     "Open as Reading View": "打开为阅读模式",
     "Search word": "查找单词/短语",
-    "Refresh Word Database": "刷新单词数据库",
 
     // DataPanelView.ts
     "Data Panel": "单词列表",
@@ -126,8 +125,6 @@ export default {
     "Cambridge": "剑桥词典",
     "Hujiang": "沪江小D",
 
-    "Word Database Path": "单词数据库路径",
-    "Choose a md file as word database for auto-completion": "选择一个md文件作为单词数据库以自动补全",
     "Destroy Database": "销毁数据库",
     "Destroy all stuff and start over": "销毁一切从头开始",
     "Are you sure you want to destroy your database?": "删了库，可就回不了头啦",
@@ -136,10 +133,6 @@ export default {
     "No!!!": "不要!!!",
     "Reset": "重置",
     "Are you sure you want to reset last sync time?": "确定要重置刷新时间吗?",
-
-    "Text Database": "文本数据库",
-    "Auto refresh": "自动刷新数据库",
-    "Auto refresh database when submitting": "当提交单词时自动刷新文本数据库",
 
 
     "IndexDB Database": "IndexDB 数据库",
@@ -213,17 +206,11 @@ export default {
     "Font Family": "字体",
     "Line Height": "行高",
 
-    "Auto Completion": "自动补全",
-    "Column delimiter": "列分隔符",
-    "Comma": "英文逗号 ,",
-    "Tab": "制表符 tab",
-    "Pipe": "竖线 |",
     "Review": "复习",
     "Accent": "口音",
     "Choose your preferred accent": "选择你更喜欢的口音",
     "American": "美式",
     "British": "英式",
-    "Delimiter": "分隔符",
 
     "As Server": "成为服务器",
     "Self as Server": "开启服务器功能",
@@ -280,7 +267,6 @@ export default {
     "SM-2 lapse factor description": "Hard/Again 的间隔缩减系数（0-1]",
     "Maximum interval (days)": "最大间隔天数",
     "Maximum interval description": "任何调度间隔的上限",
-    "Show interval on review buttons": "评分按钮显示间隔预览",
     "SR migration source file": "SR 迁移源文件",
     "SR migration source description": "旧复习导出文件（md），其中 <!--SR:--> 进度可一键迁回",
     "Migrate SR Progress": "从 SR 文件迁移复习进度",

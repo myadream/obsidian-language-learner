@@ -101,12 +101,8 @@ export interface MyPluginSettings {
 
     storage: StorageSetting;
 
-    // text db
-    word_database: string;
-    // 旧 SR 复习导出文件路径，现在作为"从 SR 文件迁移复习进度"的源
+    // SR 迁移源文件：旧复习导出文件路径，作为"从 SR 文件迁移复习进度"的源
     review_database: string;
-    col_delimiter: "," | "\t" | "|";
-    auto_refresh_db: boolean;
     // review
     review_prons: "0" | "1";
     review_algorithm: "FSRS" | "SM-2";
@@ -115,7 +111,6 @@ export interface MyPluginSettings {
     review_sm2_easy_bonus: number;
     review_sm2_lapse_factor: number;
     review_maximum_interval: number;
-    review_show_interval: boolean;
 }
 
 export interface StorageSetting {
@@ -202,11 +197,8 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
         }
     },
 
-    // text db
-    word_database: "",
+    // SR 迁移源
     review_database: "",
-    col_delimiter: ",",
-    auto_refresh_db: true,
     // reading
     default_paragraphs: "4",
     font_size: "15px",
@@ -222,7 +214,6 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
     review_sm2_easy_bonus: 1.3,
     review_sm2_lapse_factor: 0.5,
     review_maximum_interval: 36525,
-    review_show_interval: true,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -242,11 +233,9 @@ export class SettingTab extends PluginSettingTab {
         this.langSettings(containerEl);
         this.querySettings(containerEl);
         this.storageSettings(containerEl);
-        this.textDBSettings(containerEl);
-        // 复习调度紧随文本数据库/SR 迁移源，相关设置聚在一起（否则整页太长容易漏看）
+        // 复习调度紧随存储设置（SR 迁移源也在该组），相关设置聚在一起
         this.reviewSettings(containerEl);
         this.readingSettings(containerEl);
-        this.completionSettings(containerEl);
         // this.selfServerSettings(containerEl);
     }
 
@@ -650,45 +639,6 @@ export class SettingTab extends PluginSettingTab {
             );
     }
 
-    textDBSettings(containerEl: HTMLElement) {
-        containerEl.createEl("h3", {text: t("Text Database")});
-
-        new Setting(containerEl)
-            .setName(t("Auto refresh"))
-            .setDesc(t("Auto refresh database when submitting"))
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.auto_refresh_db)
-                .onChange(async (value) => {
-                    this.plugin.settings.auto_refresh_db = value;
-                    await this.plugin.saveSettings();
-                })
-            );
-
-        new Setting(containerEl)
-            .setName(t("Word Database Path"))
-            .setDesc(t("Choose a md file as word database for auto-completion"))
-            .addText((text) =>
-                text
-                    .setValue(this.plugin.settings.word_database)
-                    .onChange(async (path) => {
-                        this.plugin.settings.word_database = path;
-                        await this.plugin.saveSettings();
-                    })
-            );
-
-        new Setting(containerEl)
-            .setName(t("SR migration source file"))
-            .setDesc(t("SR migration source description"))
-            .addText((text) =>
-                text
-                    .setValue(this.plugin.settings.review_database)
-                    .onChange(async (path) => {
-                        this.plugin.settings.review_database = path;
-                        await this.plugin.saveSettings();
-                    })
-            );
-    }
-
     readingSettings(containerEl: HTMLElement) {
         containerEl.createEl("h3", {text: t("Reading Mode")});
 
@@ -764,26 +714,20 @@ export class SettingTab extends PluginSettingTab {
             );
     }
 
-    completionSettings(containerEl: HTMLElement) {
-        containerEl.createEl("h3", {text: t("Auto Completion")});
-
-        new Setting(containerEl)
-            .setName(t("Column delimiter"))
-            .addDropdown(dilimiter => dilimiter
-                .addOption(",", t("Comma"))
-                .addOption("\t", t("Tab"))
-                .addOption("|", t("Pipe"))
-                .setValue(this.plugin.settings.col_delimiter)
-                .onChange(async (value: "," | "\t" | "|") => {
-                    this.plugin.settings.col_delimiter = value;
-                    await this.plugin.saveSettings();
-                })
-            );
-
-    }
-
     reviewSettings(containerEl: HTMLElement) {
         containerEl.createEl("h3", {text: t("Review")});
+
+        new Setting(containerEl)
+            .setName(t("SR migration source file"))
+            .setDesc(t("SR migration source description"))
+            .addText((text) =>
+                text
+                    .setValue(this.plugin.settings.review_database)
+                    .onChange(async (path) => {
+                        this.plugin.settings.review_database = path;
+                        await this.plugin.saveSettings();
+                    })
+            );
 
         new Setting(containerEl)
             .setName(t("Accent"))
@@ -880,16 +824,6 @@ export class SettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }
                 }, 500))
-            );
-
-        new Setting(containerEl)
-            .setName(t("Show interval on review buttons"))
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.review_show_interval)
-                .onChange(async (value) => {
-                    this.plugin.settings.review_show_interval = value;
-                    await this.plugin.saveSettings();
-                })
             );
 
         new Setting(containerEl)

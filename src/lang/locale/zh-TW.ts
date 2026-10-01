@@ -7,7 +7,6 @@ export default {
     "Open statistics": "開啟統計",
     "Open as Reading View": "開啟為閱讀模式",
     "Search word": "查詢單字/片語",
-    "Refresh Word Database": "重新整理單字資料庫",
 
     // DataPanelView.ts
     "Data Panel": "單字列表",
@@ -113,8 +112,6 @@ export default {
     "Cambridge": "劍橋詞典",
     "Hujiang": "滬江小D",
 
-    "Word Database Path": "單字資料庫路徑",
-    "Choose a md file as word database for auto-completion": "選擇一個md文件作為單字資料庫以自動補全",
     "Destroy Database": "銷燬資料庫",
     "Destroy all stuff and start over": "銷燬一切從頭開始",
     "Are you sure you want to destroy your database?": "刪了庫，可就回不了頭啦",
@@ -123,10 +120,6 @@ export default {
     "No!!!": "不要!!!",
     "Reset": "重置",
     "Are you sure you want to reset last sync time?": "確定要重置重新整理時間嗎?",
-
-    "Text Database": "文字資料庫",
-    "Auto refresh": "自動重新整理資料庫",
-    "Auto refresh database when submitting": "當提交單字時自動重新整理文字資料庫",
 
 
     "IndexDB Database": "IndexDB 資料庫",
@@ -198,11 +191,6 @@ export default {
     "Font Family": "字型",
     "Line Height": "行高",
 
-    "Auto Completion": "自動補全",
-    "Column delimiter": "列分隔符",
-    "Comma": "英文逗號 ,",
-    "Tab": "製表符 tab",
-    "Pipe": "豎線 |",
     "Review": "復習",
     "Accent": "口音",
     "Choose your preferred accent": "選擇你更喜歡的口音",
@@ -264,7 +252,6 @@ export default {
     "SM-2 lapse factor description": "Hard/Again 的間隔縮減係數（0-1]",
     "Maximum interval (days)": "最大間隔天數",
     "Maximum interval description": "任何調度間隔的上限",
-    "Show interval on review buttons": "評分按鈕顯示間隔預覽",
     "SR migration source file": "SR 遷移源文件",
     "SR migration source description": "舊複習匯出文件（md），其中 <!--SR:--> 進度可一鍵遷回",
     "Migrate SR Progress": "從 SR 文件遷移複習進度",

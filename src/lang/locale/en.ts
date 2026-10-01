@@ -7,8 +7,6 @@ export default {
     "Open statistics": "Open statistics",
     "Open as Reading View": "Open as Reading View",
     "Search word": "Search word",
-    "Refresh Word Database": "Refresh Word Database",
-    "Refresh Review Database": "Refresh Review Database",
 
     // DataPanelView.ts
     "Data Panel": "Data Panel",
@@ -128,8 +126,6 @@ export default {
     "Cambridge": "Cambridge",
     "Hujiang": "Hujiang",
 
-    "Word Database Path": "Word Database Path",
-    "Choose a md file as word database for auto-completion": "Choose a md file as word database for auto-completion",
     "Destroy Database": "Destroy Database",
     "Destroy all stuff and start over": "Destroy all stuff and start over",
     "Are you sure you want to destroy your database?": "Are you sure you want to destroy your database",
@@ -138,10 +134,6 @@ export default {
     "No!!!": "No!!!",
     "Reset": "Reset",
     "Are you sure you want to reset last sync time?": "Are you sure you want to reset last sync time",
-
-    "Text Database": "Text Database",
-    "Auto refresh": "Auto refresh",
-    "Auto refresh database when submitting": "Auto refresh database when submitting",
 
 
     "IndexDB Database": "IndexDB Database",
@@ -213,18 +205,11 @@ export default {
     "Font Family": "Font Family",
     "Line Height": "Line Height",
 
-    "Auto Completion": "Auto Completion",
-    "Column delimiter": "Column delimiter",
-    "Comma": "Comma",
-    "Tab": "Tab",
-    "Pipe": "Pipe",
-
     "Review": "Review",
     "Accent": "Accent",
     "Choose your preferred accent": "Choose your preferred accent",
     "American": "American",
     "British": "British",
-    "Delimiter": "Delimiter",
 
 
     "As Server": "As Server",
@@ -282,7 +267,6 @@ export default {
     "SM-2 lapse factor description": "Interval shrink factor for Hard/Again (0-1]",
     "Maximum interval (days)": "Maximum interval (days)",
     "Maximum interval description": "Upper bound of any scheduled interval",
-    "Show interval on review buttons": "Show interval on review buttons",
     "SR migration source file": "SR migration source file",
     "SR migration source description": "Old review export (md) whose <!--SR:--> progress can be migrated",
     "Migrate SR Progress": "Migrate SR Progress",

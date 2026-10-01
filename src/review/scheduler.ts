@@ -31,17 +31,3 @@ export function scheduleWord(
         maximumInterval: settings.maximumInterval,
     });
 }
-
-/** 四键间隔预览（纯函数，不落库） */
-export function previewAll(
-    current: WordSchedule | undefined,
-    now: number,
-    settings: ReviewSettings,
-): Record<ReviewResponse, WordSchedule> {
-    return {
-        again: scheduleWord(current, "again", now, settings),
-        hard: scheduleWord(current, "hard", now, settings),
-        good: scheduleWord(current, "good", now, settings),
-        easy: scheduleWord(current, "easy", now, settings),
-    };
-}

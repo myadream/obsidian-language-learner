@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fsrsNext } from "@/review/fsrs";
 import { sm2ToFsrs } from "@/review/migrate";
-import { previewAll, scheduleWord } from "@/review/scheduler";
+import { scheduleWord } from "@/review/scheduler";
 import { sm2Next } from "@/review/sm2";
 import { ReviewSettings, WordSchedule } from "@/review/types";
 
@@ -56,16 +56,5 @@ describe("scheduleWord 跨算法换算", () => {
         };
         const expected = sm2Next({ interval: 10, ease: 250, due: NOW + 10 * DAY }, "good", NOW, SM2_PARAMS);
         expect(scheduleWord(current, "good", NOW, SM2_ON)).toEqual(expected);
-    });
-});
-
-describe("previewAll", () => {
-    it("四键齐全，again 间隔 0（当日到期语义），纯函数不落库", () => {
-        const p = previewAll(undefined, NOW, SM2_ON);
-        expect(Object.keys(p).sort()).toEqual(["again", "easy", "good", "hard"]);
-        expect(p.again.interval).toBe(0);
-        expect(p.good.interval).toBeGreaterThan(0);
-        // 纯函数：重复调用结果一致
-        expect(previewAll(undefined, NOW, SM2_ON)).toEqual(p);
     });
 });

@@ -29,11 +29,9 @@ function makePlugin(record?: any, postSpy?: any) {
             native: "zh",
             foreign: "en",
             review_prons: "0",
-            auto_refresh_db: false,
             storage: { storage_type: "idb" },
         },
         store: { dark: false },
-        refreshTextDB: async () => {},
         storage: {
             DB: () => ({
                 getExpression: async () => record,

@@ -163,10 +163,6 @@ export function useLearn() {
         );
         dispatchEvent(new CustomEvent("obsidian-langr-refresh-stat"));
 
-        if (plugin.settings.auto_refresh_db) {
-            plugin.refreshTextDB();
-        }
-
         return true;
     }
 

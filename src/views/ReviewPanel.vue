@@ -12,8 +12,6 @@ import { getThemeOverrides } from "@/styles/theme";
 import { speakWord } from "@/utils/pronounce";
 import { ReviewService, ReviewQueueItem } from "@/review/review-service";
 import { reviewSettingsFrom } from "@/review/settings";
-import { previewAll } from "@/review/scheduler";
-import { formatInterval } from "@/review/format";
 import { ReviewResponse } from "@/review/types";
 import { ExpressionInfo } from "@/storage/interface";
 import type PluginType from "@/plugin";
@@ -28,6 +26,7 @@ const RESPONSES: ReviewResponse[] = ["again", "hard", "good", "easy"];
 const LABEL: Record<ReviewResponse, string> = {
     again: "Again", hard: "Hard", good: "Good", easy: "Easy",
 };
+// 键盘快捷键（不在按钮上显示，避免多余数字）
 const HOTKEY: Record<ReviewResponse, string> = {
     again: "1", hard: "2", good: "3", easy: "4",
 };
@@ -44,9 +43,7 @@ const skippedCount = ref(0);
 const noCards = ref(false);
 const current = ref<ReviewQueueItem | null>(null);
 const record = ref<ExpressionInfo | null>(null);
-const previews = ref<Record<string, string>>({});
 
-const showInterval = computed(() => plugin.settings.review_show_interval);
 const theme = computed(() => (plugin.store.dark ? darkTheme : undefined));
 const themeConfig = computed<GlobalThemeOverrides>(() =>
     getThemeOverrides(plugin.store.dark)
@@ -88,7 +85,6 @@ function next() {
     }
     current.value = queue[idx];
     record.value = null;
-    previews.value = {};
     showDetails.value = false;
     idx++;
     state.value = "front";
@@ -101,19 +97,21 @@ async function showAnswer() {
     } catch (e) {
         console.warn("[review] load expression failed", e);
     }
-    const p = previewAll(
-        current.value.schedule,
-        Date.now() / 1000,
-        reviewSettingsFrom(plugin.settings),
-    );
-    previews.value = Object.fromEntries(
-        RESPONSES.map((r) => [r, formatInterval(p[r].interval)]),
-    );
     state.value = "back";
 }
 
+/** 正面即可评分（未看答案），背面评分推进队列 */
 async function rate(response: ReviewResponse) {
-    if (state.value !== "back" || !current.value) return;
+    if ((state.value !== "front" && state.value !== "back") || !current.value) return;
+    const wasFront = state.value === "front";
+    if (wasFront) {
+        // 正面直接评分时补载完整释义（下一张卡正面不需要，只为完成页/一致性）
+        try {
+            record.value = await plugin.storage.DB().getExpression(current.value.expression);
+        } catch (e) {
+            console.warn("[review] load expression failed", e);
+        }
+    }
     try {
         const { schedule, dueToday } = await svc().applyReview(
             current.value.expression,
@@ -172,7 +170,7 @@ function onKey(e: KeyboardEvent) {
         showAnswer();
         return;
     }
-    if (state.value !== "back") return;
+    if (state.value !== "front" && state.value !== "back") return;
     const hit = RESPONSES.find((r) => HOTKEY[r] === e.key);
     if (hit) {
         e.preventDefault();
@@ -269,21 +267,20 @@ function highlight(text: string): string {
                             </ul>
                         </template>
                     </div>
-
-                    <div class="review-rating">
-                        <NButton
-                            v-for="resp in RESPONSES"
-                            :key="resp"
-                            :type="resp === 'again' ? 'error' : resp === 'good' ? 'primary' : 'default'"
-                            size="large"
-                            @click="rate(resp)"
-                        >
-                            {{ t(LABEL[resp]) }}
-                            <span class="btn-hotkey">{{ HOTKEY[resp] }}</span>
-                            <span v-if="showInterval" class="btn-interval">{{ previews[resp] }}</span>
-                        </NButton>
-                    </div>
                 </template>
+
+                <!-- 评分按钮：正反面常驻（正面可直接评分） -->
+                <div v-if="state === 'front' || state === 'back'" class="review-rating">
+                    <NButton
+                        v-for="resp in RESPONSES"
+                        :key="resp"
+                        :type="resp === 'again' ? 'error' : resp === 'good' ? 'primary' : 'default'"
+                        size="large"
+                        @click="rate(resp)"
+                    >
+                        {{ t(LABEL[resp]) }}
+                    </NButton>
+                </div>
             </div>
         </NConfigProvider>
     </div>
@@ -419,18 +416,6 @@ function highlight(text: string): string {
     display: block;
     color: var(--ll-text-3);
     font-size: 13px;
-}
-
-.btn-interval {
-    opacity: 0.75;
-    margin-left: 6px;
-    font-size: 12px;
-}
-
-.btn-hotkey {
-    opacity: 0.5;
-    margin-left: 4px;
-    font-size: 11px;
 }
 </style>
 

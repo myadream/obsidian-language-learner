@@ -2,10 +2,8 @@ import {
     Editor,
     MarkdownView,
     Menu,
-    Notice,
     Platform,
     Plugin,
-    TFile,
     ViewState,
     WorkspaceLeaf,
 } from "obsidian";
@@ -31,7 +29,6 @@ import type {Position} from "./constant";
 import {InputModal} from "./modals"
 
 import Global from "./views/Global.vue";
-import {ExpressionInfoSimple} from "@/storage/interface";
 import {normalizeStorageSetting} from "@/storage/settings-normalize";
 import { StorageProvider } from "./storage/provider";
 
@@ -141,13 +138,6 @@ export default class LanguageLearner extends Plugin {
     }
 
     addCommands() {
-        // 注册刷新单词数据库命令
-        this.addCommand({
-            id: "langr-refresh-word-database",
-            name: t("Refresh Word Database"),
-            callback: this.refreshWordDb,
-        });
-
         // 注册复习命令
         this.addCommand({
             id: "langr-review-open",
@@ -243,68 +233,6 @@ export default class LanguageLearner extends Plugin {
             //popstate: true,
         } as ViewState);
     }
-
-    async refreshTextDB() {
-        await this.refreshWordDb();
-        (this.app as any).commands.executeCommandById(
-            "various-complements:reload-custom-dictionaries"
-        );
-    }
-
-    refreshWordDb = async () => {
-        if (!this.settings.word_database) {
-            return;
-        }
-
-        const dataBase = this.app.vault.getAbstractFileByPath(
-            this.settings.word_database
-        );
-        if (!dataBase || dataBase.hasOwnProperty("children")) {
-            new Notice("Invalid refresh database path");
-            return;
-        }
-        // 获取所有非无视单词的简略信息
-        const resp = await this.storage.DB().getAllExpressionSimple(false);
-        const words = resp.data as ExpressionInfoSimple[];
-
-        const classified: number[][] = Array(5)
-            .fill(0)
-            .map((): number[] => []);
-        words.forEach((word: ExpressionInfoSimple, i: number) => {
-            classified[word.status].push(i);
-        });
-
-        const statusMap = [
-            t("Ignore"),
-            t("Learning"),
-            t("Familiar"),
-            t("Known"),
-            t("Learned"),
-        ];
-
-        const del = this.settings.col_delimiter;
-
-        // 正向查询
-        const classified_texts = classified.map((w, idx) => {
-            return (
-                `#### ${statusMap[idx]}\n` +
-                w.map((i) => `${words[i].expression}${del}    ${words[i].meaning}`)
-                    .join("\n") + "\n"
-            );
-        });
-        classified_texts.shift();
-        const word2Meaning = classified_texts.join("\n");
-
-        // 反向查询
-        const meaning2Word = classified
-            .flat()
-            .map((i) => `${words[i].meaning}  ${del}  ${words[i].expression}`)
-            .join("\n");
-
-        const text = word2Meaning + "\n\n" + "#### 反向查询\n" + meaning2Word;
-        const db = dataBase as TFile;
-        this.app.vault.modify(db, text);
-    };
 
     // 在MardownView的扩展菜单加一个转为Reading模式的选项
     registerReadingToggle = () => {

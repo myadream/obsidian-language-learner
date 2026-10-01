@@ -108,30 +108,47 @@ describe("ReviewPanel", () => {
         return now;
     }
 
-    it("到期卡先出：正面显示单词与进度，显示答案后四键带间隔预览", async () => {
+    it("到期卡先出：正面即有评分键；背面笔记例句折叠；按钮无数字", async () => {
         await seedTwoWords();
         const wrapper = mountPanel(makePlugin(fixture.drive));
         await settle();
 
         expect(wrapper.text()).toContain("apple");
         expect(wrapper.text()).toContain("1 / 2");
+        // 正面同时显示显示答案与四个评分键
+        expect(buttonByText(wrapper, "Good")!).toBeTruthy();
+        expect(buttonByText(wrapper, "Again")!).toBeTruthy();
 
         await buttonByText(wrapper, "Show Answer")!.trigger("click");
         await settle();
-
         expect(wrapper.text()).toContain("苹果");
-        // delay 1 天：good = (10 + 0.5) * 2.5 = 26.3 天
-        const goodBtn = buttonByText(wrapper, "Good")!;
-        expect(goodBtn.text()).toContain("26d");
-        expect(buttonByText(wrapper, "Again")!.text()).toContain("now");
 
-        // 笔记/例句默认折叠，点击按钮后才显示
+        // 按钮只含文案，无快捷键/间隔统计数字
+        const goodBtn = buttonByText(wrapper, "Good")!;
+        expect(goodBtn.text().trim()).toBe("Good");
+
+        // 笔记/例句默认折叠，点击按钮后显示
         expect(wrapper.text()).not.toContain("词根记忆");
         expect(wrapper.text()).not.toContain("An apple a day");
         await buttonByText(wrapper, "Notes & Sentences")!.trigger("click");
         await settle();
         expect(wrapper.text()).toContain("词根记忆");
         expect(wrapper.text()).toContain("An apple a day");
+    });
+
+    it("正面可直接评分：落库并推进队列", async () => {
+        await seedTwoWords();
+        const wrapper = mountPanel(makePlugin(fixture.drive));
+        await settle();
+
+        await buttonByText(wrapper, "Good")!.trigger("click");
+        await settle();
+
+        const sched = await fixture.drive.getSchedule("apple");
+        expect(sched!.algorithm).toBe("SM-2");
+        expect(sched!.interval).toBe(26.3);
+        expect(wrapper.text()).toContain("banana");
+        expect(wrapper.text()).toContain("2 / 2");
     });
 
     it("评分落库并推进队列；全部完成后进完成页", async () => {

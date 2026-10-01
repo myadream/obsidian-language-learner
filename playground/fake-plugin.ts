@@ -282,7 +282,6 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
             review_sm2_easy_bonus: 1.3,
             review_sm2_lapse_factor: 0.5,
             review_maximum_interval: 36525,
-            review_show_interval: true,
             review_database: "",
         },
         app: { workspace: {} },
@@ -290,7 +289,6 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
             DB: () => db,
             reRegister: async () => {},
         },
-        refreshTextDB: async () => {},
     };
 
     return reactive(plugin);
