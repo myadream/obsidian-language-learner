@@ -40,3 +40,6 @@ coverage/
 
 # SDD 计划工作区（.superpowers/sdd，会话产物）
 .superpowers/
+
+# 发布产物（CI 打包上传 Release 用；本地打包的同名 zip 不入库）
+/obsidian-language-learner-*.zip
