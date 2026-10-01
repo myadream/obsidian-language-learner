@@ -1,7 +1,7 @@
 # 单词学习状态颜色配置
 
-> **类型**：技术参考（现行有效）　**最后验证**：2026-09-30（2026-09-30 UI 重设计后与 src/statusColors.ts / statusColors.css 核对一致）
-> 跨模块的工程约定与架构总览见根目录 [agent.md](../../agent.md)，文档组织规则见 [../README.md](../README.md)；UI 整体规范见 [ui-design-system.md](ui-design-system.md)。
+> **类型**：技术参考（现行有效）　**最后同步**：2026-09-30（UI 重设计后与 src/statusColors.ts / statusColors.css 核对一致）
+> 跨模块的工程约定与架构总览见根目录 [AGENTS.md](../../AGENTS.md)，文档组织规则见 [../README.md](../README.md)；UI 整体规范见 [ui-design-system.md](ui-design-system.md)。
 
 ## 概述
 

@@ -1,11 +1,11 @@
 # UI 设计系统
 
-> **类型**：技术参考（现行有效）　**最后同步**：2026-09-30（与 src/styles/、各视图核对一致）
-> 跨模块约定见根目录 [agent.md](../../agent.md)；状态色细节见 [status-colors.md](status-colors.md)；DataPanel 页面落地见 [datapanel.md](datapanel.md)。
+> **类型**：技术参考（现行有效）　**最后同步**：2026-10-01（与 src/styles/、各视图核对一致）
+> 跨模块约定见根目录 [AGENTS.md](../../AGENTS.md)；状态色细节见 [status-colors.md](status-colors.md)；DataPanel 页面落地见 [datapanel.md](datapanel.md)。
 
 ## 设计原则
 
-2026-09-30 全量 UI 重设计确立的方向（ui-ux-pro-max 检索驱动，生产力工具关键词）：
+2026-09-30 全量 UI 重设计确立的方向：
 
 - **扁平化（Flat Design）**：无重渐变、无叠层阴影，仅保留层级提示阴影；150–200ms 过渡
 - **内容优先**：融入 Obsidian 界面，不与宿主抢视觉；表面/文字/边框全部映射 Obsidian 原生变量
@@ -59,25 +59,17 @@ const themeConfig = { ...getThemeOverrides(store.dark), Drawer: { ... } };
 
 ## 组件级约定
 
-- **SVG 图标**：内联 `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor">`，尺寸经 CSS 控制；放在 NButton 里用 `<template #icon>`。
+- **SVG 图标**：内联 `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor">`（Lucide 风格路径），放在 NButton 里用 `<template #icon>`。**图标 svg 必须写显式 `width`/`height` 属性**（配组件 CSS 双保险）——naive-ui 只约束 `.n-button__icon` 容器尺寸、不管 slot 内 svg，宿主环境 CSS 不可控，漏写会以 300×150 默认尺寸渲染（曾以「图标缺失」形式暴露）。
+- **原生 `<button>` 图标按钮必须重置宿主按钮样式**：Obsidian 全局 `button` 规则带 `inline-flex + padding(4px 12px) + height(var(--input-height))`，而 svg 的 UA 默认 `overflow:hidden` 使其作为 flex 子项 `min-width` 塌为 0——固定小尺寸的原生按钮（发音/删除/折叠等）不写 `padding: 0; box-sizing: border-box;` 且 svg 不加 `flex-shrink: 0` 的话，图标会被挤压成色块甚至完全消失（2026-10-01 打包后发音图标消失的根因；naive-ui NButton 自带 padding 不受影响，所以只出现在自绘按钮上）。
+- **发音按钮**：volume-2 图标（speaker + 两道弧），`t("Pronounce")` 作 title/aria-label，点击调 `speakWord`（utils/pronounce，全局母语/外语/口音配置）；朗读例句前剥 HTML 标签。现有三处：WordCardList 行内、WordMoreModal 单词旁、WordMoreModal 每条例句旁。
+- **长文本单元格禁止 nowrap**：`white-space: nowrap` 的文本会把 flex 链各层 min-content 撑到整行文本宽（`min-width: 0` 挡不住 intrinsic 贡献），曾有列表释义列把整个页面撑出横向滚动。长释义/备注一律换行：`white-space: normal + overflow-wrap: anywhere`（数据行内单词本体可保留单行省略）。
+- **v-html 内容的样式**：scoped 样式打不中 `v-html` 注入的节点（无 data-v 属性），相关规则（如 `<mark>` 高亮）必须放**非 scoped 块**并手动命名空间限定（参考 WordMoreModal 末尾 `.word-more-modal .sentence-text mark`）。
+- **SCSS `&.class` 嵌套提升特异性**：`&.sentence-card { .x {} }` 编译为 `.item-card.sentence-card .x`（多一个类），媒体查询里的覆盖规则若少写前缀会被基础规则压制且不报错——覆盖选择器必须与被覆盖者同级（实例：LearnPanelForm 例句翻译/出处 <560px 单列规则）。
 - **图表颜色**：SVG 表现属性（`stroke="var(--x)"`）**不解析 CSS 变量**，系列色必须经内联 `:style` 传入（CustomChart 的路径/圆点/渐变 stop、DonutChart 的扇区均如此）。
 - **弹框**：详见 [datapanel.md](datapanel.md) 的弹框节；关键陷阱——`NModal` 上的自定义 class 落在生成的 `.n-card` / `.n-dialog` 元素**自身**，写样式用 `&.n-card` / 元素自身选择器，不要写后代 `.xxx .n-card`。
-- **空状态**：方形圆角底（radius-md）+ 居中 SVG 图标 + 一句说明 + 动作按钮，参考 DataPanel `.pane-state`。
+- **空状态**：方形圆角底（radius-md）+ 居中 SVG 图标 + 一句说明 + 动作按钮，参考 DataPanel `.pane-state`；详情类弹框的空状态放在内容头部信息（如 WordMoreModal hero）之下，保证标题信息始终可见。
 - **状态芯片**：圆点 + 文字的方形小圆角徽标（radius-xs，静态语义徽标，不是可点 pill），样式见 WordCardList 的 `.ll-status-chip`（SCSS `@each` 展开 `--status-*`）。
 - **编号分节头**：~~编号分节~~（2026-09-30 v2.1 按用户反馈移除数字前缀）→ 分节统一为「大写小标题 + 底部细线」，操作类节（添加笔记/例句）头部右侧放添加按钮（LearnPanelForm `.form-sec`、WordMoreModal `.section-header`）。**用户偏好：列表筛选用下拉而非分段切换；分节标题不加数字前缀。**
-
-## 2026-09-30 重设计改造清单
-
-| 模块 | 文件 | 要点 |
-|------|------|------|
-| 令牌/主题 | `styles/tokens.css`、`styles/theme.ts`（新增） | 全套 `--ll-*`；共享 naive-ui 覆盖 |
-| 全局样式 | `main.css` / `main.ts` | 修复 main.css 未被打包的存量 bug（入口导入） |
-| DataPanel | `views/DataPanel.vue` + `component/DataPanel/*` | 工具栏/筛选卡/摘要行/卡片/弹框（见 datapanel.md） |
-| 统计 | `views/Stat.vue`、`CustomChart.vue`、`DonutChart.vue` | KPI 卡、图表色走变量、SVG 内联 style |
-| 阅读 | `views/ReadingArea.vue`、`CountBar.vue` | 工具栏令牌化、选中/悬停主色、计数条状态色 |
-| 查词 | `views/SearchPanel.vue`、`DictItem.vue`、`PopupSearch.vue` | 搜索栏图标化、折叠头令牌化 |
-| 学习面板 | `views/LearnPanelForm.vue`、`LearnPanelModal.vue`、`useLearn.ts` | 状态彩色芯片、表达式/类型同行、底栏固定提交（见 datapanel.md 弹框节） |
-| 状态色 | `statusColors.ts` / `statusColors.css` | Ignore→石板灰、Learned→品牌青绿、暗色覆盖 |
 
 ## 2026-09-30 v2 全量布局重设计（方形圆角 + 结构推翻）
 
@@ -91,9 +83,9 @@ const themeConfig = { ...getThemeOverrides(store.dark), Drawer: { ... } };
 | CountBar | 胶囊分段条 | 方形分段条（段内名称+数值、右端单位切换提示图标） |
 | SearchPanel | 单行工具栏（历史+输入+按钮） | 查询区两级：词头行（当前词大字 + 历史导航）+ 搜索行（前缀图标输入 + 图标主按钮） |
 | PopupSearch | 主色拖拽条 | 中性拖拽条（握把点 + Lucide 图钉，方形卡片带边框） |
-| LearnPanelForm | 标准纵向表单（radio 圆点） | **分节式表单**（词条/释义/状态/标签/笔记/例句，细线分节**无编号**）；类型为方形分段按钮、状态为分段色带；笔记/例句为**卡片列表**（头部「添加」按钮 + 卡片右上角移除按钮） |
-| LearnPanelModal | dialog 圆角卡 | 方形 dialog + 顶部 2px 主色线 + 大写小标题 + closable；宽度 `min(640px, 94vw)`，<560px 压缩内边距；提交仍固定底栏 |
-| WordMoreModal | 双栏并排（已废弃） | **单列纵向档案**（笔记 → 例句，细线分节无编号），长内容 `overflow-wrap: anywhere` |
+| LearnPanelForm | 标准纵向表单（radio 圆点） | **分节式表单**（词条/释义/状态/标签/笔记/例句，细线分节**无编号**）；类型为方形分段按钮、状态为分段色带；笔记/例句为**卡片头式卡片**（2026-10-01：类型图标 + 「笔记/例句 N」序号 + 垃圾桶删除在卡片头，输入区全宽；例句翻译/出处带小标签并排、窄屏单列；点「添加」自动滚动定位新卡片） |
+| LearnPanelModal | dialog 圆角卡 | 方形 dialog + 顶部 2px 主色线 + 大写小标题 + closable、无 (i) 图标；宽度 `min(640px, 94vw)`，<560px 压缩内边距；提交仍固定底栏 |
+| WordMoreModal | 双栏并排（已废弃） | **单词档案**（2026-10-01：内容区顶部 hero＝大号单词 + 发音 + 含义，标题固定「单词详情」）+ 单列纵向（笔记 → 例句，细线分节无编号，每条例句带发音按钮），长内容 `overflow-wrap: anywhere` |
 
 ## 交付前检查清单
 
@@ -101,5 +93,8 @@ const themeConfig = { ...getThemeOverrides(store.dark), Drawer: { ... } };
 - [ ] 明暗两套主题下检查对比度（正文 ≥ 4.5:1）
 - [ ] 可交互元素：cursor、hover 反馈（150–300ms）、可见焦点环、键盘可达
 - [ ] 动画尊重 `prefers-reduced-motion`
-- [ ] 图标全部 SVG，无 emoji
+- [ ] 图标全部 SVG（带显式 width/height），无 emoji
+- [ ] 原生 `<button>` 图标按钮已重置宿主样式：`padding: 0` + `box-sizing: border-box` + svg `flex-shrink: 0`
+- [ ] 长文本单元格（释义/笔记）换行展示，无 `white-space: nowrap` 截断
+- [ ] UI 改动用 playground（根 AGENTS.md 常用命令）在明暗两种主题下过一遍截图再交付
 - [ ] `pnpm build` 后抽查 styles.css 是否包含新选择器（防止样式入口问题）

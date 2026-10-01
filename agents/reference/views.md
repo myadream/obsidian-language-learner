@@ -1,6 +1,6 @@
 # 视图层架构（views/）
 
-> **类型**：技术参考（现行有效）　**最后同步**：2026-09-30
+> **类型**：技术参考（现行有效）　**最后同步**：2026-10-01
 > 视图代码在 `src/views/`，通用组件在 `src/component/`。UI 视觉规范见 [ui-design-system.md](ui-design-system.md)。
 
 ## 挂载模型
@@ -31,7 +31,7 @@
 
 ## LearnPanelForm 的双入口
 
-`LearnPanelForm.vue` 被**侧边栏**（LearnPanel.vue，提交按钮经 `#action` 槽插在表单尾部）与**弹框**（LearnPanelModal.vue，提交/取消在弹框底栏 `#action`）共用。共享逻辑在 `useLearn.ts`：表单 model、校验 rules、标签异步搜索（tagSearch）、`submit()`（提交 → `postExpression` → 广播 refresh 事件 → 可选自动刷新文本库）。改动表单结构时两个入口都要验证。
+`LearnPanelForm.vue` 被**侧边栏**（LearnPanel.vue，提交按钮经 `#action` 槽插在表单尾部）与**弹框**（LearnPanelModal.vue，提交/取消在弹框底栏 `#action`）共用。共享逻辑在 `useLearn.ts`：表单 model、校验 rules、标签异步搜索（tagSearch）、`submit()`（**剔除空白笔记/例句卡片** → `postExpression` → 广播 refresh 事件 → 可选自动刷新文本库）。表单内点「添加笔记/例句」会把新卡片 `scrollIntoView`。改动表单结构时两个入口都要验证。
 
 ## ReadingArea 要点
 
@@ -44,7 +44,9 @@
 
 | 组件 | 用途 |
 |------|------|
-| WordMoreModal | 单词详情弹框（笔记/例句/复制，见 datapanel.md） |
+| WordMoreModal | 单词详情弹框（hero＝单词+发音+含义、笔记/例句/逐句发音/复制，见 datapanel.md） |
 | AudioPlayer | 阅读页音频播放器（自动重试/缓冲状态文案，见 i18n.md 词条清单） |
 | WordMore.vue | 已废弃（无引用） |
 | DataPanel/* | 见 [datapanel.md](datapanel.md) |
+
+调试工具：`playground/`（浏览器渲染真实组件 + 假数据，见根 AGENTS.md 常用命令），改弹框/列表样式先在 playground 验证再进 Obsidian。

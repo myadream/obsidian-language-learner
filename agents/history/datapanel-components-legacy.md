@@ -1,5 +1,8 @@
 # DataPanel 组件重构说明
 
+> **状态**：已过时（已被取代）——现状以 [../reference/datapanel.md](../reference/datapanel.md) 为准
+> **最后同步**：2026-09-30 —— 归档至 history/；本文为 isMobile prop 时代的旧版组件拆分说明，现行子组件契约见 reference/datapanel.md
+
 ## 概述
 
 对 DataPanel.vue 进行了组件拆分和移动端展示优化，提高了代码的可维护性和移动端用户体验。
@@ -10,8 +13,7 @@
 src/component/DataPanel/
 ├── ActionButtons.vue          # 操作按钮组件
 ├── SearchFilterPanel.vue      # 搜索和筛选面板组件
-├── TagFilter.vue              # 标签筛选组件
-└── README.md                  # 本文档
+└── TagFilter.vue              # 标签筛选组件
 ```
 
 ## 组件说明
@@ -113,14 +115,6 @@ const themeConfig: GlobalThemeOverrides = {
    - 简化移动端显示信息
    - 优化分页控件
 
-## 使用方法
-
-直接使用主组件即可，子组件会自动处理移动端适配：
-
-```vue
-<DataPanel />
-```
-
 ## 样式覆盖
 
 如需自定义样式，可以针对以下选择器：
@@ -143,10 +137,3 @@ const themeConfig: GlobalThemeOverrides = {
 2. 搜索功能内置了 500ms 防抖
 3. 表格在移动端会自动简化显示，详细信息通过展开查看
 4. 分页组件会自动适配移动端
-
-## 未来改进建议
-
-1. 添加虚拟滚动以支持大数据集
-2. 考虑添加移动端手势支持
-3. 优化移动端的表格展开交互
-4. 添加更多的移动端专用功能（如批量编辑）

@@ -1,6 +1,6 @@
 # DataPanel 页面架构
 
-> **类型**：技术参考（现行有效）　**最后同步**：2026-09-30
+> **类型**：技术参考（现行有效）　**最后同步**：2026-10-01
 > 入口 `src/views/DataPanel.vue`，子组件在 `src/component/DataPanel/`。设计令牌见 [ui-design-system.md](ui-design-system.md)；历史改造方案见 [../history/datapanel-plan.md](../history/datapanel-plan.md)。
 
 ## 页面结构（2026-09-30 v2.1：命令条 + 筛选轨 + 账本行）
@@ -26,7 +26,7 @@
         └── .pane-state          # 空/错误状态（方形圆角图标块）
 ```
 
-行内布局要点：释义作为单词下方的次行展示（无释义时行不留空洞），标签在词块内换行全部展示（无截断列）；<760px（右侧边栏停靠）隐藏列头/日期/记录列、操作按钮常显。
+行内布局要点：释义作为单词下方的次行展示、**随内容换行不截断**（nowrap 会把整行 min-content 撑出容器造成页面横向溢出，禁止改回；见 ui-design-system 组件约定），无释义时行不留空洞；**行内固定列（状态芯片/日期/记录/操作）与单词行顶对齐**（`align-items: flex-start`——含义换行后行高不一，垂直居中会让芯片脱离单词行）；标签在词块内换行全部展示（无截断列）；<760px（右侧边栏停靠）隐藏列头/日期/记录列、操作按钮常显。
 
 状态/类型/标签筛选都直接改 `searchParams` 并立即重查（`refetchFromFirstPage`）；`resetFilters` 同时清空搜索、排序与标签勾选，标签有变化时经 watch 重查、否则手动重查（避免双请求）。
 
@@ -54,7 +54,7 @@
 | ActionButtons | 命令条右侧操作簇（图标按钮 + 分隔线 + primary 新增） | `hasActiveFilters` | addWord / refresh / resetFilters / export |
 | SearchFilterPanel | 词/义 NSelect 下拉 + 单输入框（切换目标字段，另一字段有值时显示橙点提示） | `modelValue` | update:modelValue / search（内部 500ms 防抖） |
 | TagFilter | 筛选轨标签清单（原生 checkbox 列表）+ And/Or 模式 | tags / checkedTags / mode | update:checkedTags / update:mode |
-| WordCardList | 账本式数据行（列头 + TransitionGroup 行；词块=单词+释义+标签纵块；状态左缘色条；悬停显现图标操作（编辑铅笔/详情眼睛）；键盘可达 role=button；<760px 隐藏列头/日期/记录列、操作常显） | data | edit |
+| WordCardList | 账本式数据行（列头 + TransitionGroup 行；词块=单词+释义+标签纵块，释义换行；状态左缘色条；行点击打开详情弹框；悬停显现图标操作（发音/编辑铅笔，2026-10-01 移除冗余的详情眼睛按钮）；键盘可达 role=button；<760px 隐藏列头/日期/记录列、操作常显） | data | edit |
 | ~~MobileWordList~~ | **已废弃**（未挂载的死代码，留待清理） | — | — |
 
 数据行内部：状态芯片用 `.ll-status-chip.s-*` 类（方形小圆角，CSS 变量取色）；日期相对化（Today/Yesterday/星期/MM-DD）。
@@ -63,10 +63,12 @@
 
 | 弹框 | 用途 | 关键点 |
 |------|------|--------|
-| LearnPanelModal（`views/`） | 新增/编辑单词 | preset=dialog；方形弹框 + 顶部 2px 主色线 + closable；宽度 `min(640px, 94vw)`，<560px 压缩内边距；**提交/取消固定底栏**（`#action` 槽），内容区独立滚动；编辑态标题切 `t("Edit Word")`；表单体 LearnPanelForm 与侧边栏 LearnPanel 共用——分节式表单（无编号标题），状态选择器为分段色带（`--status-*`），类型为方形分段按钮，笔记/例句为卡片列表（头部添加 + 卡片右上角移除） |
-| WordMoreModal（`component/`） | 查看笔记/例句 | preset=card；**单列纵向**（笔记 → 例句，细线分节），长内容 `overflow-wrap: anywhere`；`#header-extra` 复制全部，分节复制；例句中单词 `<mark>` 高亮（primary-soft 底）；空状态带图标 |
+| LearnPanelModal（`views/`） | 新增/编辑单词 | preset=dialog、`:show-icon="false"`（无 (i) 图标）；方形弹框 + 顶部 2px 主色线 + closable；宽度 `min(640px, 94vw)`；**根元素 padding:0 让底栏通栏，标题/内容/底栏各自补内边距**（24px 水平，<560px 收 16px）——漏掉标题/内容的内边距会让表单全贴边；**提交/取消固定底栏**（`#action` 槽），内容区独立滚动；编辑态标题切 `t("Edit Word")`；word prop 变化经 watch 深拷贝进 model（immediate + null 兜底，查库失败不炸表单）；表单体 LearnPanelForm 与侧边栏 LearnPanel 共用——分节式表单（无编号标题），状态选择器为分段色带（`--status-*`），类型为方形分段按钮；笔记/例句为**卡片头式卡片**（类型图标 + 「笔记/例句 N」序号 + 垃圾桶删除在卡片头，输入区全宽），例句卡翻译/出处带小标签并排（<560px 收单列——媒体查询选择器须带 `.item-card.sentence-card` 前缀，否则被基础规则特异性压制）；点「添加」后自动 `scrollIntoView` 新卡片 |
+| WordMoreModal（`component/`） | 查看单词详情 | preset=card、标题固定「单词详情」；**内容区顶部 hero**：大号单词 + 发音按钮 + 「全部复制」（hero 行右侧）+ 含义（`white-space: pre-line`，缺省不占位）；其下单列纵向（笔记 → 例句，细线分节），长内容 `overflow-wrap: anywhere`；每条例句左侧发音按钮；分节复制；例句中单词 `<mark>` 高亮（primary-soft 底）——**高亮样式必须放非 scoped 块**（v-html 注入的 mark 无 data-v 属性）；空状态（图标 + 一句话）在 hero 之下，单词与含义始终可见 |
 
-**弹框样式陷阱**：NModal 上的自定义 class（`word-more-modal` / `learn-panel-modal`）落在生成的 `.n-card` / `.n-dialog` 元素**自身**上，样式要写 `&.n-card` 或直接对 class 写，后代选择器 `.xxx .n-card` 永远不匹配。
+**弹框/表单共享行为**：发音按钮统一走 `utils/pronounce.ts` 的 `speakWord(文本, { native, foreign, accent })`（全局母语/外语/口音配置），朗读前剥掉 HTML 标签；提交（`useLearn.submit`）会**剔除空白笔记与空白例句卡片**后再入库——新增写库路径不得绕过。
+
+**弹框样式陷阱**：NModal 上的自定义 class（`word-more-modal` / `learn-panel-modal`）落在生成的 `.n-card` / `.n-dialog` 元素**自身**上，样式要写 `&.n-card` 或直接对 class 写，后代选择器 `.xxx .n-card` 永远不匹配。更多样式陷阱（v-html/scoped、按钮 svg 尺寸、SCSS 特异性）见 [ui-design-system.md](ui-design-system.md) 组件约定。
 
 ## 样式与令牌
 
