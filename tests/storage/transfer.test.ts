@@ -10,12 +10,16 @@ import {
     parseSqliteItems,
     stringifyExportJson,
     stringifyExportCsv,
+    exportUnifiedItems,
+    importUnifiedItems,
+    TransferItem,
 } from "@/storage/transfer";
 import { loadSqlJs } from "@/storage/drive/sqlite3/uitils";
 import { makeDrive, DriveFixture, MANIFEST_ID } from "../setup/drive-factory";
 import { MemVaultAdapter } from "../setup/mem-adapter";
 import moment from "moment";
 import { ExpressionInfo, WordType } from "@/storage/interface";
+import { WordSchedule } from "@/review/types";
 
 function makeItem(over: Partial<ExpressionInfo> = {}): ExpressionInfo {
     return {
@@ -319,4 +323,64 @@ describe("cross-driver transfer via unified JSON", () => {
             await fixture.drive.close();
         }
     });
+});
+
+describe("schedule data in unified JSON (v2)", () => {
+    const sched: WordSchedule = { algorithm: "SM-2", due: 1700000000, interval: 10, ease: 250 };
+
+    it("stringify → parse round-trips schedule; version bumps to 2", () => {
+        const items: TransferItem[] = [
+            makeItem(),
+            { ...makeItem({ expression: "beta" }), schedule: sched },
+        ];
+        const text = stringifyExportJson(items);
+        expect(JSON.parse(text).version).toBe(2);
+
+        const parsed = parseJsonItems(text);
+        expect(parsed[1].schedule).toEqual(sched);
+        expect(parsed[0].schedule).toBeUndefined();
+    });
+
+    it("drops malformed schedule objects on import", () => {
+        const text = JSON.stringify({
+            version: 2,
+            exported_at: 1,
+            data: [{ ...makeItem(), schedule: { algorithm: "BOGUS" } }],
+        });
+        const parsed = parseJsonItems(text);
+        expect(parsed[0].schedule).toBeUndefined();
+    });
+
+    it("legacy v1 payload without schedule imports; word treated as new card", async () => {
+        const text = JSON.stringify({
+            version: 1,
+            exported_at: 1700000000,
+            data: [makeItem({ expression: "old-word" })],
+        });
+        const fixture = await makeDrive("indexed");
+        await importUnifiedItems(fixture.drive, parseJsonItems(text));
+        expect(await fixture.drive.getExpression("old-word")).not.toBeNull();
+        expect(await fixture.drive.getSchedule("old-word")).toBeUndefined();
+        await fixture.drive.close();
+    });
+
+    it.each(["indexed", "sqlite", "csv"] as const)(
+        "full chain via %s: schedule survives export → parse → import",
+        async (target) => {
+            const source = await makeDrive("indexed");
+            await source.drive.postExpression(makeItem({ expression: "apple" }), 1700000000);
+            await source.drive.postExpression(makeItem({ expression: "beta", status: 1 }), 1700000001);
+            await source.drive.putSchedule("apple", sched);
+
+            const items = await exportUnifiedItems(source.drive);
+            await source.drive.close();
+
+            const dest = await makeDrive(target);
+            await importUnifiedItems(dest.drive, parseJsonItems(stringifyExportJson(items)));
+            expect(await dest.drive.getSchedule("apple")).toEqual(sched);
+            // 无调度的词按新卡处理
+            expect(await dest.drive.getSchedule("beta")).toBeUndefined();
+            await dest.drive.close();
+        }
+    );
 });

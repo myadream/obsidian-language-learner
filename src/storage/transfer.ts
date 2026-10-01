@@ -10,6 +10,7 @@ import {
     extractAllDataFromDatabase,
     loadSqlJs,
 } from "@/storage/drive/sqlite3/uitils";
+import { WordSchedule } from "@/review/types";
 
 /**
  * 外层统一的数据库导入/导出：
@@ -18,19 +19,33 @@ import {
  *   因此任何驱动都可以用任意格式导入导出，互相迁移不再受驱动差异限制。
  *
  * 统一格式约定：
- * - JSON：{ version, exported_at, data: ExpressionInfo[] }（date 为 UNIX 秒）；
- *   导入时兼容旧格式：裸数组、{ data: [...] }、IndexedDB 旧版导出的 Dexie dump。
- * - CSV：Expression,Meaning,Status,Type,Tags,Date（仅词条级数据，不含笔记/例句/关联），
+ * - JSON：{ version, exported_at, data: TransferItem[] }（date 为 UNIX 秒）；
+ *   v2 起词条可携带 schedule（复习调度，全保真）；导入时兼容旧格式：
+ *   裸数组、{ data: [...] }、IndexedDB 旧版导出的 Dexie dump（无 schedule = 新卡）。
+ * - CSV：Expression,Meaning,Status,Type,Tags,Date（仅词条级数据，不含笔记/例句/关联/调度），
  *   与历史导出格式一致；Date 兼容 UNIX 秒与文本日期。
  * - SQLite3：本插件 schema 的 .sqlite 文件（含 sqlite 驱动在 vault 里的持久化文件），
  *   只作导入源，导出统一走 JSON/CSV。
  */
 export type TransferFormat = "json" | "csv" | "sqlite3";
 
+/** 统一条目：v2 起 JSON 里可携带复习调度 */
+export type TransferItem = ExpressionInfo & { schedule?: WordSchedule };
+
 export interface ExportPayload {
     version: number;
     exported_at: number;
-    data: ExpressionInfo[];
+    data: TransferItem[];
+}
+
+function isWordSchedule(v: any): v is WordSchedule {
+    return (
+        !!v &&
+        typeof v === "object" &&
+        (v.algorithm === "FSRS" || v.algorithm === "SM-2") &&
+        typeof v.due === "number" &&
+        typeof v.interval === "number"
+    );
 }
 
 // ---- 解析：文件 → 数据 ----
@@ -39,7 +54,7 @@ export async function parseImportFile(
     plugin: Plugin,
     file: File,
     format: TransferFormat
-): Promise<ExpressionInfo[]> {
+): Promise<TransferItem[]> {
     if (format === "json") {
         return parseJsonItems(await file.text());
     }
@@ -50,7 +65,7 @@ export async function parseImportFile(
 }
 
 /** JSON：统一格式 / 裸数组 / {data:[...]} / Dexie dump */
-export function parseJsonItems(text: string): ExpressionInfo[] {
+export function parseJsonItems(text: string): TransferItem[] {
     const parsed = JSON.parse(text);
 
     if (Array.isArray(parsed)) {
@@ -68,13 +83,13 @@ export function parseJsonItems(text: string): ExpressionInfo[] {
     throw new Error("Invalid JSON format");
 }
 
-function normalizeItems(items: any[]): ExpressionInfo[] {
+function normalizeItems(items: any[]): TransferItem[] {
     return items
         .map(normalizeItem)
-        .filter((item): item is ExpressionInfo => item !== null);
+        .filter((item): item is TransferItem => item !== null);
 }
 
-function normalizeItem(item: any): ExpressionInfo | null {
+function normalizeItem(item: any): TransferItem | null {
     if (!item || typeof item !== "object") {
         return null;
     }
@@ -83,7 +98,7 @@ function normalizeItem(item: any): ExpressionInfo | null {
     if (!expression || typeof expression !== "string") {
         return null;
     }
-    return {
+    const base: TransferItem = {
         expression: expression.trim(),
         meaning: String(item.meaning ?? item.Meaning ?? ""),
         status: Number.parseInt(String(item.status ?? item.Status ?? 0)) || 0,
@@ -104,6 +119,10 @@ function normalizeItem(item: any): ExpressionInfo | null {
         connections: Array.isArray(item.connections) ? item.connections.map(String) : [],
         date: item.date !== undefined ? toUnixSeconds(item.date) : moment().unix(),
     };
+    if (isWordSchedule(item.schedule)) {
+        base.schedule = item.schedule;
+    }
+    return base;
 }
 
 /** Dexie dump：expressions 表内嵌 tags/notes/connections，sentences 另表按 _id 引用 */
@@ -155,7 +174,7 @@ function parseDexieDump(parsed: any): ExpressionInfo[] {
 }
 
 /** CSV：表头 Expression,Meaning,Status,Type,Tags,Date；兼容无表头的旧文件 */
-export function parseCsvItems(text: string): ExpressionInfo[] {
+export function parseCsvItems(text: string): TransferItem[] {
     // 去掉 BOM（Windows 编辑器保存的 CSV 常带）
     const clean = text.replace(/^\uFEFF/, "");
     const lines = clean.split(/\r?\n/).filter((line) => line.trim().length > 0);
@@ -186,7 +205,7 @@ export function parseCsvItems(text: string): ExpressionInfo[] {
 }
 
 /** SQLite3：读本插件 schema 的 .sqlite 文件 */
-export async function parseSqliteItems(plugin: Plugin, file: File): Promise<ExpressionInfo[]> {
+export async function parseSqliteItems(plugin: Plugin, file: File): Promise<TransferItem[]> {
     const sqlJs = await loadSqlJs(plugin);
     const bytes = new Uint8Array(await file.arrayBuffer());
     const db = new sqlJs.Database(bytes);
@@ -199,9 +218,9 @@ export async function parseSqliteItems(plugin: Plugin, file: File): Promise<Expr
 
 // ---- 序列化：数据 → 文件 ----
 
-export function stringifyExportJson(items: ExpressionInfo[]): string {
+export function stringifyExportJson(items: TransferItem[]): string {
     const payload: ExportPayload = {
-        version: 1,
+        version: 2,
         exported_at: moment().unix(),
         data: items,
     };
@@ -222,21 +241,46 @@ export function stringifyExportCsv(items: ExpressionInfo[]): string {
 
 // ---- 编排：驱动 ↔ 文件 ----
 
+/** 词条 + 调度合并为统一导出条目（JSON 全保真路径；exportToFile 与测试共用） */
+export async function exportUnifiedItems(drive: StorageDrive): Promise<TransferItem[]> {
+    const [items, schedules] = await Promise.all([
+        drive.exportData(),
+        drive.getAllSchedules(),
+    ]);
+    const byExpression = new Map(schedules.map((r) => [r.expression, r.schedule]));
+    return items.map((item) => {
+        const schedule = byExpression.get(item.expression);
+        return schedule ? { ...item, schedule } : item;
+    });
+}
+
+/** 统一导入：词条走 importData，v2 携带的调度拆回关联表走 importSchedules（语义随驱动） */
+export async function importUnifiedItems(drive: StorageDrive, items: TransferItem[]): Promise<void> {
+    await drive.importData(items);
+    const records = items
+        .filter((item) => item.schedule)
+        .map((item) => ({ expression: item.expression, schedule: item.schedule! }));
+    if (records.length > 0) {
+        await drive.importSchedules(records);
+    }
+}
+
 export async function exportToFile(
     plugin: Plugin,
     drive: StorageDrive,
     format: "json" | "csv"
 ): Promise<void> {
-    const items = await drive.exportData();
     const name = plugin.settings.storage.storage_name;
 
     if (format === "csv") {
+        const items = await drive.exportData();
         download(
             new Blob([stringifyExportCsv(items)], { type: "text/csv" }),
             `${name}.csv`,
             "text/csv"
         );
     } else {
+        const items = await exportUnifiedItems(drive);
         download(
             new Blob([stringifyExportJson(items)], { type: "application/json" }),
             `${name}.json`,
@@ -252,5 +296,5 @@ export async function importFromFile(
     format: TransferFormat
 ): Promise<void> {
     const items = await parseImportFile(plugin, file, format);
-    await drive.importData(items);
+    await importUnifiedItems(drive, items);
 }
