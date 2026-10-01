@@ -8,6 +8,7 @@
           :mask-closable="false"
           preset="dialog"
           :title="isEdit ? t('Edit Word') : t('Learning New Words')"
+          :show-icon="false"
           class="learn-panel-modal"
           :style="{ width: 'min(640px, 94vw)' }"
           closable
@@ -93,9 +94,24 @@ watch(
 watch(
   () => props.word,
   (newValue) => {
+    // 兜底：查询失败时 word 可能是 null/undefined，直接深拷贝会让 model 变 null 炸掉表单
+    const base =
+      newValue && typeof newValue === "object"
+        ? newValue
+        : {
+            expression: null,
+            meaning: null,
+            status: 1,
+            t: "WORD",
+            tags: [],
+            notes: [],
+            sentences: [],
+            connections: [],
+          };
     // 防止重复
-    model.value = JSON.parse(JSON.stringify(newValue));
-  }
+    model.value = JSON.parse(JSON.stringify(base));
+  },
+  { immediate: true }
 );
 
 // 切换明亮/黑暗模式
@@ -130,14 +146,15 @@ async function submit() {
     border-top: 2px solid var(--ll-primary);
     padding: 0;
 
-    // 模态框标题样式
+    // 模态框标题样式（根元素 padding 已置 0 让底栏通栏，标题/内容各自补内边距）
     .n-dialog__title {
+      padding: var(--ll-space-4) var(--ll-space-5) var(--ll-space-2);
+      padding-right: calc(var(--ll-space-6) + 16px);
       font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: var(--ll-text-2);
-      margin-right: var(--ll-space-4);
     }
 
     // 内容区域（长表单滚动，滚动条隐藏保持扁平观感）
@@ -146,7 +163,7 @@ async function submit() {
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      padding-top: var(--ll-space-2);
+      padding: var(--ll-space-2) var(--ll-space-5) var(--ll-space-4);
 
       &::-webkit-scrollbar {
         display: none;
@@ -161,7 +178,7 @@ async function submit() {
 
     // 底部操作栏（固定，不随内容滚动）
     .n-dialog__action {
-      padding: var(--ll-space-3) 24px;
+      padding: var(--ll-space-3) var(--ll-space-5);
       border-top: 1px solid var(--ll-border);
       background: var(--ll-surface-2);
 
@@ -185,15 +202,17 @@ async function submit() {
       max-height: 92vh;
 
       .n-dialog__title {
+        padding: var(--ll-space-3) var(--ll-space-4) var(--ll-space-1);
+        padding-right: calc(var(--ll-space-6) + 8px);
         font-size: 13px;
       }
 
       .n-dialog__content {
-        padding-top: 0;
+        padding: var(--ll-space-1) var(--ll-space-4) var(--ll-space-3);
       }
 
       .n-dialog__action {
-        padding: var(--ll-space-2) var(--ll-space-3);
+        padding: var(--ll-space-2) var(--ll-space-4);
       }
     }
   }

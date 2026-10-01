@@ -63,6 +63,21 @@
                     <NButton
                         size="tiny"
                         quaternary
+                        :title="t('Pronounce')"
+                        :aria-label="t('Pronounce')"
+                        @click.stop="pronounce(item.expr)"
+                    >
+                        <template #icon>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                            </svg>
+                        </template>
+                    </NButton>
+                    <NButton
+                        size="tiny"
+                        quaternary
                         :title="t('Edit')"
                         :aria-label="t('Edit')"
                         @click.stop="handleEdit(item)"
@@ -70,22 +85,6 @@
                         <template #icon>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                            </svg>
-                        </template>
-                    </NButton>
-                    <NButton
-                        v-if="item.noteNum + item.senNum > 0"
-                        size="tiny"
-                        quaternary
-                        type="info"
-                        :title="t('Details')"
-                        :aria-label="t('Details')"
-                        @click.stop="handleViewDetails(item)"
-                    >
-                        <template #icon>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                <circle cx="12" cy="12" r="3" />
                             </svg>
                         </template>
                     </NButton>
@@ -103,11 +102,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, getCurrentInstance } from 'vue';
 import { NButton } from 'naive-ui';
 import { t } from '@/lang/helper';
 import { StatusClassMap } from '@/statusColors';
 import WordMoreModal from '@/component/WordMoreModal.vue';
+import { speakWord } from '@/utils/pronounce';
+import type PluginType from '@/plugin';
 import { moment } from 'obsidian';
 
 interface Row {
@@ -128,6 +129,17 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: 'edit', item: Row): void;
 }>();
+
+const plugin = getCurrentInstance()?.appContext.config.globalProperties.plugin as PluginType;
+
+// 行内发音：沿用全局母语/外语/口音配置
+const pronounce = (expr: string) => {
+    speakWord(expr, {
+        native: plugin.settings.native,
+        foreign: plugin.settings.foreign,
+        accent: plugin.settings.review_prons,
+    });
+};
 
 const showModal = ref(false);
 const currentWord = ref<Row | null>(null);
@@ -199,13 +211,15 @@ const formatDate = (dateStr: string) => {
         .col-status { flex: 0 0 86px; }
         .col-date { flex: 0 0 72px; text-align: right; }
         .col-records { flex: 0 0 64px; text-align: right; }
-        .col-actions { flex: 0 0 64px; }
+        .col-actions { flex: 0 0 52px; }
     }
 
     // ── 数据行 ──────────────────────────────────────────────
     .ledger-row {
         display: flex;
-        align-items: center;
+        // 固定列（状态/日期/记录/操作）与单词行顶对齐：
+        // 含义换行后行高不一，垂直居中会让状态芯片看起来脱离单词行
+        align-items: flex-start;
         gap: var(--ll-space-3);
         padding: var(--ll-space-2) var(--ll-space-4) var(--ll-space-2) calc(var(--ll-space-4) + 3px);
         border-bottom: 1px solid var(--ll-border);
@@ -267,12 +281,14 @@ const formatDate = (dateStr: string) => {
                 transition: color var(--ll-speed) var(--ll-ease);
             }
 
+            // 含义随内容换行展示（nowrap 会把整行撑出容器并截断长释义）
             .row-meaning {
                 font-size: 12px;
+                line-height: 1.55;
                 color: var(--ll-text-3);
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
             }
 
             // 标签随内容换行，全部展示
@@ -326,7 +342,7 @@ const formatDate = (dateStr: string) => {
 
         // 行内操作：方形图标按钮，悬停显现
         .row-actions {
-            flex: 0 0 64px;
+            flex: 0 0 52px;
             display: flex;
             justify-content: flex-end;
             gap: 2px;

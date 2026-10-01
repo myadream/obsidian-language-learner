@@ -119,7 +119,7 @@
                         <div class="sec-spacer"></div>
                         <NButton size="tiny" quaternary @click="addNote">
                             <template #icon>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="12" y1="5" x2="12" y2="19" />
                                     <line x1="5" y1="12" x2="19" y2="12" />
                                 </svg>
@@ -127,27 +127,35 @@
                             {{ t("Add Note") }}
                         </NButton>
                     </div>
-                    <div class="sec-body item-list">
+                    <div class="sec-body item-list" :ref="setNoteListEl">
                         <div v-for="(note, i) in model.notes" :key="`note-${i}`" class="item-card">
+                            <div class="item-head">
+                                <svg class="item-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <span class="item-label">{{ t("Notes") }} {{ i + 1 }}</span>
+                                <div class="sec-spacer"></div>
+                                <button
+                                    type="button"
+                                    class="item-remove"
+                                    :title="t('Remove')"
+                                    :aria-label="t('Remove')"
+                                    @click="removeNote(i)"
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                </button>
+                            </div>
                             <NInput
                                 size="medium"
                                 type="textarea"
                                 :placeholder="t('Write a new note')"
                                 v-model:value="model.notes[i]"
-                                :autosize="{ minRows: 1, maxRows: 5 }"
+                                :autosize="{ minRows: 2, maxRows: 6 }"
                             />
-                            <button
-                                type="button"
-                                class="item-remove"
-                                :title="t('Remove')"
-                                :aria-label="t('Remove')"
-                                @click="removeNote(i)"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
-                            </button>
                         </div>
                     </div>
                 </section>
@@ -159,7 +167,7 @@
                         <div class="sec-spacer"></div>
                         <NButton size="tiny" quaternary @click="addSentence">
                             <template #icon>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="12" y1="5" x2="12" y2="19" />
                                     <line x1="5" y1="12" x2="19" y2="12" />
                                 </svg>
@@ -167,26 +175,32 @@
                             {{ t("Add Sentence") }}
                         </NButton>
                     </div>
-                    <div class="sec-body item-list">
+                    <div class="sec-body item-list" :ref="setSenListEl">
                         <div v-for="(sen, i) in model.sentences" :key="`sen-${i}`" class="item-card sentence-card">
-                            <button
-                                type="button"
-                                class="item-remove"
-                                :title="t('Remove')"
-                                :aria-label="t('Remove')"
-                                @click="removeSentence(i)"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
+                            <div class="item-head">
+                                <svg class="item-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                                 </svg>
-                            </button>
+                                <span class="item-label">{{ t("Sentences") }} {{ i + 1 }}</span>
+                                <div class="sec-spacer"></div>
+                                <button
+                                    type="button"
+                                    class="item-remove"
+                                    :title="t('Remove')"
+                                    :aria-label="t('Remove')"
+                                    @click="removeSentence(i)"
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                </button>
+                            </div>
 
                             <NFormItem
                                 :show-label="false"
                                 :show-feedback="false"
                                 :path="`sentences[${i}].sentence`"
-                                :rule="sourceRule"
                             >
                                 <NInput
                                     size="medium"
@@ -197,11 +211,8 @@
                                 />
                             </NFormItem>
                             <div class="sentence-meta">
-                                <NFormItem
-                                    :show-feedback="false"
-                                    :show-label="false"
-                                    :path="`sentences[${i}].trans`"
-                                >
+                                <div class="meta-field">
+                                    <span class="meta-label">{{ t("Translation") }}</span>
                                     <NInput
                                         size="medium"
                                         type="textarea"
@@ -209,12 +220,9 @@
                                         :placeholder="t('Translation (Optional)')"
                                         :autosize="{ minRows: 1, maxRows: 3 }"
                                     />
-                                </NFormItem>
-                                <NFormItem
-                                    :show-feedback="false"
-                                    :show-label="false"
-                                    :path="`sentences[${i}].origin`"
-                                >
+                                </div>
+                                <div class="meta-field">
+                                    <span class="meta-label">{{ t("Origin") }}</span>
                                     <NInput
                                         size="medium"
                                         type="textarea"
@@ -222,7 +230,7 @@
                                         :placeholder="t('Origin (Optional)')"
                                         :autosize="{ minRows: 1, maxRows: 3 }"
                                     />
-                                </NFormItem>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -235,7 +243,7 @@
 </template>
 
 <script setup lang="ts">
-import { PropType, computed, watch } from "vue";
+import { PropType, computed, watch, ref, nextTick } from "vue";
 import {
     NConfigProvider,
     NForm,
@@ -260,7 +268,6 @@ const props = defineProps({
 
 const {
     rules,
-    sourceRule,
     statusOptions,
     themeOverrides,
     tagOptions,
@@ -286,9 +293,24 @@ watch(
     { immediate: true }
 );
 
+// 笔记/例句列表容器（用于新增后滚动定位）
+const noteListEl = ref<HTMLElement | null>(null);
+const senListEl = ref<HTMLElement | null>(null);
+const setNoteListEl = (el: any) => { noteListEl.value = el; };
+const setSenListEl = (el: any) => { senListEl.value = el; };
+
+// 新增后把卡片滚入可视区：区块在弹框滚动容器末尾时，
+// 不滚动的话用户点「添加」会觉得没反应
+async function scrollLastCard(listEl: HTMLElement | null, selector: string) {
+    await nextTick();
+    const cards = listEl?.querySelectorAll(selector);
+    cards?.[cards.length - 1]?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+}
+
 // 笔记增删
 const addNote = () => {
     props.model.notes.push("");
+    scrollLastCard(noteListEl.value, ".item-card");
 };
 const removeNote = (index: number) => {
     props.model.notes.splice(index, 1);
@@ -297,6 +319,7 @@ const removeNote = (index: number) => {
 // 例句增删
 const addSentence = () => {
     props.model.sentences.push({ sentence: "", trans: "", origin: "" });
+    scrollLastCard(senListEl.value, ".sentence-card");
 };
 const removeSentence = (index: number) => {
     props.model.sentences.splice(index, 1);
@@ -348,6 +371,13 @@ const onExpressionInput = (value: string) => {
 
             .sec-spacer {
                 flex: 1;
+            }
+
+            // 头部「添加」按钮的图标尺寸（naive-ui 不会约束 slot 内 svg）
+            .n-button svg {
+                width: 12px;
+                height: 12px;
+                display: block;
             }
         }
     }
@@ -488,21 +518,44 @@ const onExpressionInput = (value: string) => {
     }
 
     .item-card {
-        position: relative;
         background: var(--ll-surface-2);
         border: 1px solid var(--ll-border);
         border-radius: var(--ll-radius-sm);
-        padding: var(--ll-space-2);
-        padding-right: 36px;
+        padding: var(--ll-space-2) var(--ll-space-3) var(--ll-space-3);
         box-sizing: border-box;
 
-        // 移除按钮：卡片右上角
+        // 卡片头：类型图标 + 序号 + 删除
+        .item-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: var(--ll-space-2);
+
+            .item-ico {
+                display: block;
+                flex-shrink: 0;
+                color: var(--ll-text-3);
+            }
+
+            .item-label {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: var(--ll-text-3);
+            }
+
+            .sec-spacer {
+                flex: 1;
+            }
+        }
+
+        // 删除按钮：卡片头右侧（padding/box-sizing 必须显式，防 Obsidian 全局 button 规则挤压图标）
         .item-remove {
-            position: absolute;
-            top: 6px;
-            right: 6px;
             width: 22px;
             height: 22px;
+            padding: 0;
+            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -515,9 +568,8 @@ const onExpressionInput = (value: string) => {
                 background-color var(--ll-speed) var(--ll-ease);
 
             svg {
-                width: 13px;
-                height: 13px;
                 display: block;
+                flex-shrink: 0;
             }
 
             &:hover {
@@ -532,16 +584,9 @@ const onExpressionInput = (value: string) => {
         }
 
         &.sentence-card {
-            padding: var(--ll-space-3);
-            padding-right: 36px;
-
             .n-form-item {
                 margin-bottom: var(--ll-space-3) !important;
                 width: 100%;
-
-                &:last-child {
-                    margin-bottom: 0 !important;
-                }
 
                 .n-form-item-blank {
                     width: 100%;
@@ -554,14 +599,28 @@ const onExpressionInput = (value: string) => {
                 }
             }
 
-            // 翻译 / 来源并排（窄屏收为单列）
+            // 翻译 / 来源并排，带小标签（窄屏收为单列）
             .sentence-meta {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: var(--ll-space-3);
 
-                .n-form-item {
-                    margin-bottom: 0 !important;
+                .meta-field {
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+
+                    .meta-label {
+                        font-size: 11px;
+                        font-weight: 600;
+                        letter-spacing: 0.04em;
+                        color: var(--ll-text-3);
+                    }
+
+                    .n-input {
+                        width: 100%;
+                    }
                 }
             }
         }
@@ -585,7 +644,8 @@ const onExpressionInput = (value: string) => {
 
     // ── 窄屏适配（侧边栏 / 小窗） ────────────────────────────
     @media (max-width: 560px) {
-        .sentence-card .sentence-meta {
+        // 选择器须与基础规则同级（.item-card.sentence-card），否则特异性不够被 1fr 1fr 压过
+        .item-card.sentence-card .sentence-meta {
             grid-template-columns: 1fr;
         }
     }

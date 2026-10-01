@@ -48,12 +48,6 @@ export function useLearn() {
         },
     };
 
-    const sourceRule = {
-        required: true,
-        trigger: ["blur", "input"],
-        message: "At least input a source sentence",
-    };
-
     const labelStyle: CSSProperties = {
         fontWeight: "bold",
     };
@@ -140,6 +134,13 @@ export function useLearn() {
         if (!data.connections) {
             data.connections = [];
         }
+        // 剔除点了「添加」但没填内容的空白笔记/例句卡片，不让垃圾数据入库
+        data.notes = (data.notes ?? [])
+            .map((n: string) => (n ?? "").trim())
+            .filter((n: string) => n.length > 0);
+        data.sentences = (data.sentences ?? []).filter(
+            (s: Sentence) => s && typeof s.sentence === "string" && s.sentence.trim().length > 0
+        );
         
         // DB Post
         const statusCode = await plugin.storage.DB().postExpression(data);
@@ -172,7 +173,6 @@ export function useLearn() {
     return {
         model,
         rules,
-        sourceRule,
         labelStyle,
         statusOptions,
         themeOverrides,

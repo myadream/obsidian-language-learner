@@ -375,7 +375,17 @@ const onAddWord = () => {
 
 // 卡片编辑处理
 const handleEditWord = async (item: Row) => {
-    word.value = await plugin.storage.DB()?.getExpression(item.expr);
+    // 列表与库可能短暂不同步（如刚被其他端删除），查不到时兜底为空表单而不是 undefined
+    word.value = (await plugin.storage.DB()?.getExpression(item.expr)) ?? {
+        expression: item.expr,
+        meaning: null,
+        status: 1,
+        t: "WORD",
+        tags: [],
+        notes: [],
+        sentences: [],
+        connections: [],
+    };
     showWordModal.value = true;
 };
 
@@ -783,12 +793,15 @@ watch(scrollContainer, (newContainer) => {
         flex-shrink: 0;
 
         // 筛选轨折叠按钮：仅窄屏显示
+        // （padding/box-sizing/svg flex-shrink 显式声明，防宿主全局 button 规则挤压图标）
         .rail-toggle {
             display: none;
             align-items: center;
             justify-content: center;
             width: 28px;
             height: 28px;
+            padding: 0;
+            box-sizing: border-box;
             flex-shrink: 0;
             border: 1px solid var(--ll-border);
             border-radius: var(--ll-radius-sm);
@@ -803,6 +816,7 @@ watch(scrollContainer, (newContainer) => {
                 width: 14px;
                 height: 14px;
                 display: block;
+                flex-shrink: 0;
             }
 
             &:hover {
