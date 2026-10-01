@@ -273,5 +273,22 @@ export default {
     "Migrate": "遷移",
     "SR file not found: {0}": "找不到 SR 文件：{0}",
     "SR migration failed: {0}": "遷移失敗：{0}",
-    "Migrated: {0} matched, {1} skipped, {2} without SR record": "遷移完成：匹配 {0} 個，跳過 {1} 個，{2} 個無 SR 記錄"
+    "Migrated: {0} matched, {1} skipped, {2} without SR record": "遷移完成：匹配 {0} 個，跳過 {1} 個，{2} 個無 SR 記錄",
+
+    // 複習報表（統計視圖）
+    "Review Reports": "複習報表",
+    "Due Now": "立即到期",
+    "New Cards": "新卡",
+    "Due in 7 Days": "7 天內到期",
+    "Avg Interval (days)": "平均間隔（天）",
+    "Scheduled Words": "已排期單字",
+    "Due Forecast (30 Days)": "到期預測（30 天）",
+    "Interval Distribution": "間隔分佈",
+    "Due": "到期數",
+    "<1 Day": "<1 天",
+    "1-7 Days": "1-7 天",
+    "7-30 Days": "7-30 天",
+    "30-90 Days": "30-90 天",
+    ">90 Days": ">90 天",
+    "Notes & Sentences": "筆記與例句"
 }

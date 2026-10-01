@@ -245,6 +245,13 @@ export function createFakePlugin(seed: FakeWord[] = createSeedWords()) {
             words = words.filter((x) => x.expression !== expr);
         },
         tryGetSen: async () => null,
+        // Stat.vue 消费的统计接口（内存近似值，仅供 UI 调试）
+        countSeven: async () =>
+            Array.from({ length: 7 }, (_, i) => ({
+                today: [0, 0, 0, 0, 0],
+                accumulated: i === 6 ? [1, 2, 2, 2, 2] : [0, 0, 0, 0, 0],
+            })),
+        getCount: async () => ({ word_count: [1, 2, 2, 2, 2], phrase_count: [0, 1, 0, 0, 0] }),
         // ---- 复习调度（schedules 关联表） ----
         getSchedule: async (expr: string) => schedules.get(expr),
         putSchedule: async (expr: string, schedule: WordSchedule) => {

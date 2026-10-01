@@ -88,7 +88,15 @@ describe("ReviewPanel", () => {
     async function seedTwoWords() {
         const now = Date.now() / 1000;
         await fixture.drive.postExpression(
-            makeInfo({ expression: "apple", meaning: "苹果", date: now - 100 })
+            makeInfo({
+                expression: "apple",
+                meaning: "苹果",
+                date: now - 100,
+                notes: ["词根记忆：ap + ple"],
+                sentences: [
+                    { expression: "apple", sentence: "An apple a day keeps the doctor away.", trans: "一天一苹果，医生远离我。", origin: "" },
+                ],
+            })
         );
         await fixture.drive.postExpression(
             makeInfo({ expression: "banana", meaning: "香蕉", date: now - 50 })
@@ -103,19 +111,27 @@ describe("ReviewPanel", () => {
     it("到期卡先出：正面显示单词与进度，显示答案后四键带间隔预览", async () => {
         await seedTwoWords();
         const wrapper = mountPanel(makePlugin(fixture.drive));
-        await flushPromises();
+        await settle();
 
         expect(wrapper.text()).toContain("apple");
         expect(wrapper.text()).toContain("1 / 2");
 
         await buttonByText(wrapper, "Show Answer")!.trigger("click");
-        await flushPromises();
+        await settle();
 
         expect(wrapper.text()).toContain("苹果");
         // delay 1 天：good = (10 + 0.5) * 2.5 = 26.3 天
         const goodBtn = buttonByText(wrapper, "Good")!;
         expect(goodBtn.text()).toContain("26d");
         expect(buttonByText(wrapper, "Again")!.text()).toContain("now");
+
+        // 笔记/例句默认折叠，点击按钮后才显示
+        expect(wrapper.text()).not.toContain("词根记忆");
+        expect(wrapper.text()).not.toContain("An apple a day");
+        await buttonByText(wrapper, "Notes & Sentences")!.trigger("click");
+        await settle();
+        expect(wrapper.text()).toContain("词根记忆");
+        expect(wrapper.text()).toContain("An apple a day");
     });
 
     it("评分落库并推进队列；全部完成后进完成页", async () => {

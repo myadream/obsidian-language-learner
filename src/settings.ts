@@ -243,9 +243,10 @@ export class SettingTab extends PluginSettingTab {
         this.querySettings(containerEl);
         this.storageSettings(containerEl);
         this.textDBSettings(containerEl);
+        // 复习调度紧随文本数据库/SR 迁移源，相关设置聚在一起（否则整页太长容易漏看）
+        this.reviewSettings(containerEl);
         this.readingSettings(containerEl);
         this.completionSettings(containerEl);
-        this.reviewSettings(containerEl);
         // this.selfServerSettings(containerEl);
     }
 

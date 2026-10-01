@@ -291,5 +291,22 @@ export default {
     "Migrate": "Migrate",
     "SR file not found: {0}": "SR file not found: {0}",
     "SR migration failed: {0}": "SR migration failed: {0}",
-    "Migrated: {0} matched, {1} skipped, {2} without SR record": "Migrated: {0} matched, {1} skipped, {2} without SR record"
+    "Migrated: {0} matched, {1} skipped, {2} without SR record": "Migrated: {0} matched, {1} skipped, {2} without SR record",
+
+    // 复习报表（统计视图）
+    "Review Reports": "Review Reports",
+    "Due Now": "Due Now",
+    "New Cards": "New Cards",
+    "Due in 7 Days": "Due in 7 Days",
+    "Avg Interval (days)": "Avg Interval (days)",
+    "Scheduled Words": "Scheduled Words",
+    "Due Forecast (30 Days)": "Due Forecast (30 Days)",
+    "Interval Distribution": "Interval Distribution",
+    "Due": "Due",
+    "<1 Day": "<1 Day",
+    "1-7 Days": "1-7 Days",
+    "7-30 Days": "7-30 Days",
+    "30-90 Days": "30-90 Days",
+    ">90 Days": ">90 Days",
+    "Notes & Sentences": "Notes & Sentences"
 };

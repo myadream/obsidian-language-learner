@@ -4,6 +4,7 @@ import { ref } from "vue";
 import { NMessageProvider } from "naive-ui";
 import DataPanel from "@/views/DataPanel.vue";
 import ReviewPanel from "@/views/ReviewPanel.vue";
+import Stat from "@/views/Stat.vue";
 import WordMoreModal from "@/component/WordMoreModal.vue";
 import store from "@/store";
 
@@ -14,7 +15,7 @@ function toggleDark(v: boolean) {
     document.body.classList.toggle("theme-dark", v);
 }
 
-const view = ref<"data" | "review">("data");
+const view = ref<"data" | "review" | "stat">("data");
 
 // 独立详情弹框场景：ghostword 不在数据库中 / 空词
 const showMissing = ref(false);
@@ -29,13 +30,15 @@ const emptyWord = "";
             <span class="pg-title">OLL UI Playground — debug harness</span>
             <button class="pg-btn" :class="{ 'pg-active': view === 'data' }" @click="view = 'data'">DataPanel</button>
             <button class="pg-btn" :class="{ 'pg-active': view === 'review' }" @click="view = 'review'">Review</button>
+            <button class="pg-btn" :class="{ 'pg-active': view === 'stat' }" @click="view = 'stat'">Stat</button>
             <label class="pg-opt"><input type="checkbox" :checked="dark" @change="toggleDark(($event.target as HTMLInputElement).checked)" /> dark</label>
             <button class="pg-btn" @click="showMissing = true">Detail: word missing in DB</button>
             <button class="pg-btn" @click="showEmptyWord = true">Detail: empty word string</button>
         </div>
         <div class="pg-panel">
             <DataPanel v-if="view === 'data'" />
-            <ReviewPanel v-else />
+            <ReviewPanel v-else-if="view === 'review'" />
+            <Stat v-else />
         </div>
 
         <NMessageProvider>

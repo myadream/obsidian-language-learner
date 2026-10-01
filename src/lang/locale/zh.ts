@@ -289,5 +289,22 @@ export default {
     "Migrate": "迁移",
     "SR file not found: {0}": "找不到 SR 文件：{0}",
     "SR migration failed: {0}": "迁移失败：{0}",
-    "Migrated: {0} matched, {1} skipped, {2} without SR record": "迁移完成：匹配 {0} 个，跳过 {1} 个，{2} 个无 SR 记录"
+    "Migrated: {0} matched, {1} skipped, {2} without SR record": "迁移完成：匹配 {0} 个，跳过 {1} 个，{2} 个无 SR 记录",
+
+    // 复习报表（统计视图）
+    "Review Reports": "复习报表",
+    "Due Now": "立即到期",
+    "New Cards": "新卡",
+    "Due in 7 Days": "7 天内到期",
+    "Avg Interval (days)": "平均间隔（天）",
+    "Scheduled Words": "已排期单词",
+    "Due Forecast (30 Days)": "到期预测（30 天）",
+    "Interval Distribution": "间隔分布",
+    "Due": "到期数",
+    "<1 Day": "<1 天",
+    "1-7 Days": "1-7 天",
+    "7-30 Days": "7-30 天",
+    "30-90 Days": "30-90 天",
+    ">90 Days": ">90 天",
+    "Notes & Sentences": "笔记与例句"
 };

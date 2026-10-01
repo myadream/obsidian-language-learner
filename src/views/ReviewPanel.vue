@@ -34,6 +34,8 @@ const HOTKEY: Record<ReviewResponse, string> = {
 
 const state = ref<"loading" | "front" | "back" | "done">("loading");
 const rootEl = ref<HTMLElement | null>(null);
+/** 背面的笔记/例句默认折叠，点击按钮后展开（每次翻到新卡重置） */
+const showDetails = ref(false);
 let queue: ReviewQueueItem[] = [];
 let idx = 0;
 const queueLen = ref(0);
@@ -87,6 +89,7 @@ function next() {
     current.value = queue[idx];
     record.value = null;
     previews.value = {};
+    showDetails.value = false;
     idx++;
     state.value = "front";
 }
@@ -246,15 +249,25 @@ function highlight(text: string): string {
                                 {{ tag }}
                             </NTag>
                         </div>
-                        <ul v-if="notes.length" class="review-notes">
-                            <li v-for="(n, i) in notes" :key="i">{{ n }}</li>
-                        </ul>
-                        <ul v-if="sentences.length" class="review-sentences">
-                            <li v-for="(s, i) in sentences" :key="i">
-                                <span class="sen-origin" v-html="highlight(s.sentence)"></span>
-                                <span v-if="s.trans" class="sen-trans">{{ s.trans }}</span>
-                            </li>
-                        </ul>
+                        <button
+                            v-if="(notes.length > 0 || sentences.length > 0) && !showDetails"
+                            type="button"
+                            class="review-details-toggle"
+                            @click="showDetails = true"
+                        >
+                            {{ t("Notes & Sentences") }}
+                        </button>
+                        <template v-if="showDetails">
+                            <ul v-if="notes.length" class="review-notes">
+                                <li v-for="(n, i) in notes" :key="i">{{ n }}</li>
+                            </ul>
+                            <ul v-if="sentences.length" class="review-sentences">
+                                <li v-for="(s, i) in sentences" :key="i">
+                                    <span class="sen-origin" v-html="highlight(s.sentence)"></span>
+                                    <span v-if="s.trans" class="sen-trans">{{ s.trans }}</span>
+                                </li>
+                            </ul>
+                        </template>
                     </div>
 
                     <div class="review-rating">
@@ -373,6 +386,23 @@ function highlight(text: string): string {
     display: flex;
     gap: var(--ll-space-2);
     flex-wrap: wrap;
+}
+
+.review-details-toggle {
+    align-self: flex-start;
+    padding: var(--ll-space-1) var(--ll-space-3);
+    box-sizing: border-box;
+    border: 1px solid var(--ll-border);
+    border-radius: var(--ll-radius-md);
+    background: var(--ll-surface-2);
+    color: var(--ll-text-2);
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover {
+        border-color: var(--ll-border-strong);
+        color: var(--ll-text);
+    }
 }
 
 .review-notes,
