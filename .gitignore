@@ -28,3 +28,15 @@ pdf
 
 # Windows nul device file artifact
 nul
+
+# playground 调试截图（会话产物，不入库）
+playground/shots/
+
+# 从本机 Obsidian 提取的宿主样式（asar-tool 产物，不入库；见 playground/main.ts 注释）
+playground/app.css
+
+# vitest 覆盖率输出
+coverage/
+
+# SDD 计划工作区（.superpowers/sdd，会话产物）
+.superpowers/
