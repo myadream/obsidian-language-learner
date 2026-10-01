@@ -1,9 +1,0 @@
-.idea/
-node_modules/
-coverage/
-*.DS_Store
-.DS_Store
-npm-debug.log
-.zcode/
-# 注意：dist/ 不忽略——本包以 file: 方式内嵌在本仓库，
-# main 指向 dist/index.js，CI 干净 checkout 必须有 dist 才能构建主插件

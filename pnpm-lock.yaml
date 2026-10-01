@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@qiyangxy/tedb-electron-storage':
-        specifier: file:package/tedb-electron-storage
-        version: file:package/tedb-electron-storage
+        specifier: ^0.6.0
+        version: 0.6.0
       '@vueuse/core':
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.43(typescript@5.9.3))
@@ -475,8 +475,8 @@ packages:
     resolution: {integrity: sha512-7FNeNl8NCE7aINx7WXiKQrPYZWC/hvrTsmk6zmxbI7LTXE7hVek/n8AfVgpe2y82zl3w0HvCHN0bVKMBoJcC0w==}
     engines: {node: '>= 10.0.0'}
 
-  '@qiyangxy/tedb-electron-storage@file:package/tedb-electron-storage':
-    resolution: {directory: package/tedb-electron-storage, type: directory}
+  '@qiyangxy/tedb-electron-storage@0.6.0':
+    resolution: {integrity: sha512-bh54F27rhkF+z5DetaJVkP/bIga9vrpBPqoX0j8EpkYyq8Tk2iyvMlLxOCKP1e1lm5vddsfJtrfOLzoYVj1iug==}
 
   '@rolldown/binding-android-arm-eabi@1.2.11':
     resolution: {integrity: sha512-A5kXfGKvKWWZE0TtPrfsvT+q4Y5d1QG8gGUzpYjGydM+fARM9MuX90PrXYXe0XbsDVgyxxNzHo6giCj90bsFNw==}
@@ -1912,7 +1912,7 @@ snapshots:
       '@parcel/watcher-win32-x64': 2.6.0
     optional: true
 
-  '@qiyangxy/tedb-electron-storage@file:package/tedb-electron-storage':
+  '@qiyangxy/tedb-electron-storage@0.6.0':
     dependencies:
       graceful-fs: 4.2.11
       tedb-utils: 0.0.1
