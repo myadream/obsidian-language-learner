@@ -2,4 +2,4 @@ allowBuilds:
   '@parcel/watcher': true
   esbuild: true
 minimumReleaseAgeExclude:
-  - '@qiyangxy/tedb-electron-storage@0.6.0'
+  - '@qiyangxy/tedb-electron-storage@0.8.0'
